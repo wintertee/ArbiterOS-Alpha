@@ -1,0 +1,111 @@
+import logging
+from typing import TypedDict
+
+from langgraph.graph import END, START, StateGraph
+from rich.logging import RichHandler
+
+from arbiteros_alpha import ArbiterOSAlpha
+from arbiteros_alpha.policy import ConfidencePolicyRouter, HistoryPolicyChecker
+
+logging.basicConfig(
+    level=logging.DEBUG,
+    handlers=[RichHandler()],
+)
+
+# 1. Setup OS
+
+os = ArbiterOSAlpha()
+
+# Policy: Prevent direct generate->toolcall without proper flow
+history_checker = HistoryPolicyChecker().add_blacklist(
+    name="no_direct_toolcall", sequence=["generate", "toolcall"]
+)
+
+# Policy: If confidence is low, regenerate the response
+confidence_router = ConfidencePolicyRouter(
+    key="confidence", threshold=0.6, target="generate"
+)
+
+
+# if add this checker, intended error will be raised
+os.add_policy_checker(history_checker)
+os.add_policy_router(confidence_router)
+
+# 2. Langgraph stuff
+
+
+class State(TypedDict):
+    """State for a simple AI assistant with tool usage and self-evaluation."""
+
+    query: str
+    response: str
+    tool_result: str
+    confidence: float
+
+
+@os.instruction("generate")
+def generate(state: State) -> State:
+    """Generate a response to the user query."""
+
+    # Check if this is a retry (response already exists)
+    is_retry = bool(state.get("response"))
+
+    if is_retry:
+        # On retry, generate a longer, better response
+        response = "Here is my comprehensive and detailed response with much more content and explanation."
+    else:
+        # First attempt: short response (will have low confidence)
+        response = "Short reply."
+
+    return {"response": response}
+
+
+@os.instruction("toolcall")
+def tool_call(state: State) -> State:
+    """Call external tools to enhance the response."""
+    return {"tool_result": "ok"}
+
+
+@os.instruction("evaluate")
+def evaluate(state: State) -> State:
+    """Evaluate confidence in the response quality."""
+    # Heuristic: response quality based on length
+    # Short response (<60 chars) = low confidence (<0.6)
+    # Longer response (>=60 chars) = high confidence (>=0.6)
+    response_length = len(state["response"])
+    confidence = min(response_length / 100.0, 1.0)
+    return {"confidence": confidence}
+
+
+builder = StateGraph(State)
+builder.add_node(generate)
+builder.add_node(tool_call)
+builder.add_node(evaluate)
+
+builder.add_edge(START, "generate")
+builder.add_edge("generate", "tool_call")
+builder.add_edge("tool_call", "evaluate")
+builder.add_edge("evaluate", END)
+
+graph = builder.compile()
+
+# 3. Run graph
+
+initial_state: State = {
+    "query": "What is AI?",
+    "response": "",
+    "tool_result": "",
+    "confidence": 0.0,
+}
+for chunk in graph.stream(initial_state, stream_mode="values", debug=True):
+    print(f"{chunk}\n")
+
+print("=" * 80)
+print("EXECUTION HISTORY")
+print("=" * 80)
+for i, entry in enumerate(os.history, 1):
+    print(f"\n[{i}] Instruction: {entry['instruction']}")
+    print(f"    Timestamp: {entry['timestamp']}")
+    print(f"    Input:     {entry['input']}")
+    print(f"    Output:    {entry['output']}")
+print("\n" + "=" * 80)
