@@ -14,8 +14,6 @@ All code comments and docstrings must follow [Google Python Style Guide](https:/
 
 ### 3. Test-Driven Development
 
-**FOR NOW: DO NOT write tests in `test/`**
-
 **Every new feature MUST include:**
 - Unit tests in the `tests/` directory
 - Test coverage for all major code paths
