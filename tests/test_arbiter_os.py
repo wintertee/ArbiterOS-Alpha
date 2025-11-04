@@ -34,9 +34,7 @@ class TestArbiterOSAlpha:
         """Test adding a policy checker to the OS."""
         # Arrange
         os = ArbiterOSAlpha()
-        checker = HistoryPolicyChecker(
-            name="test", bad_sequence=["a", "b"]
-        )
+        checker = HistoryPolicyChecker(name="test", bad_sequence=["a", "b"])
 
         # Act
         os.add_policy_checker(checker)
@@ -102,7 +100,7 @@ class TestArbiterOSAlpha:
         os = ArbiterOSAlpha()
 
         # Act
-        results, all_passed = os.check_before()
+        results, all_passed = os._check_before()
 
         # Assert
         assert results == {}
@@ -112,9 +110,7 @@ class TestArbiterOSAlpha:
         """Test check_before with a checker that passes."""
         # Arrange
         os = ArbiterOSAlpha()
-        checker = HistoryPolicyChecker(
-            name="test", bad_sequence=["a", "b"]
-        )
+        checker = HistoryPolicyChecker(name="test", bad_sequence=["a", "b"])
         os.add_policy_checker(checker)
         os.history.append(
             History(
@@ -126,7 +122,7 @@ class TestArbiterOSAlpha:
         )
 
         # Act
-        results, all_passed = os.check_before()
+        results, all_passed = os._check_before()
 
         # Assert
         assert results == {}  # Only failed checks are recorded
@@ -136,27 +132,27 @@ class TestArbiterOSAlpha:
         """Test check_before with a checker that fails."""
         # Arrange
         os = ArbiterOSAlpha()
-        checker = HistoryPolicyChecker(
-            name="no_ab", bad_sequence=["a", "b"]
-        )
+        checker = HistoryPolicyChecker(name="no_ab", bad_sequence=["a", "b"])
         os.add_policy_checker(checker)
-        os.history.extend([
-            History(
-                timestamp=datetime.datetime.now(),
-                instruction="a",
-                input_state={},
-                output_state={},
-            ),
-            History(
-                timestamp=datetime.datetime.now(),
-                instruction="b",
-                input_state={},
-                output_state={},
-            ),
-        ])
+        os.history.extend(
+            [
+                History(
+                    timestamp=datetime.datetime.now(),
+                    instruction="a",
+                    input_state={},
+                    output_state={},
+                ),
+                History(
+                    timestamp=datetime.datetime.now(),
+                    instruction="b",
+                    input_state={},
+                    output_state={},
+                ),
+            ]
+        )
 
         # Act
-        results, all_passed = os.check_before()
+        results, all_passed = os._check_before()
 
         # Assert
         assert "no_ab" in results
@@ -169,7 +165,7 @@ class TestArbiterOSAlpha:
         os = ArbiterOSAlpha()
 
         # Act
-        results, destination = os.route_after()
+        results, destination = os._route_after()
 
         # Assert
         assert results == {}
@@ -193,7 +189,7 @@ class TestArbiterOSAlpha:
         )
 
         # Act
-        results, destination = os.route_after()
+        results, destination = os._route_after()
 
         # Assert
         assert results == {}
@@ -217,7 +213,7 @@ class TestArbiterOSAlpha:
         )
 
         # Act
-        results, destination = os.route_after()
+        results, destination = os._route_after()
 
         # Assert
         assert "regenerate" in results
@@ -259,9 +255,7 @@ class TestArbiterOSAlpha:
         """Test instruction decorator behavior when policy check fails."""
         # Arrange
         os = ArbiterOSAlpha()
-        checker = HistoryPolicyChecker(
-            name="no_ab", bad_sequence=["a", "b"]
-        )
+        checker = HistoryPolicyChecker(name="no_ab", bad_sequence=["a", "b"])
         os.add_policy_checker(checker)
 
         @os.instruction("a")
@@ -298,6 +292,7 @@ class TestArbiterOSAlpha:
 
         # Assert
         from langgraph.types import Command
+
         assert isinstance(result, Command)
         assert result.update == {"confidence": 0.3}
         assert result.goto == "retry"
@@ -369,7 +364,11 @@ class TestArbiterOSAlpha:
         assert os.history[0].instruction == "first"
         assert os.history[1].instruction == "second"
         assert os.history[2].instruction == "third"
-        assert os.history[0].timestamp <= os.history[1].timestamp <= os.history[2].timestamp
+        assert (
+            os.history[0].timestamp
+            <= os.history[1].timestamp
+            <= os.history[2].timestamp
+        )
 
 
 class TestHistory:
