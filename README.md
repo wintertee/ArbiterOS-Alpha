@@ -1,3 +1,66 @@
 # ArbiterOS Alpha
 
-`uv run -m examples.main`
+**Policy-driven governance layer for LangGraph**
+
+ArbiterOS-alpha is a lightweight governance framework that wraps LangGraph, enabling policy-based validation and dynamic routing without modifying the underlying graph structure.
+
+## Quick Start
+
+```bash
+# Run example
+uv run -m examples.main
+```
+
+## Features
+
+- 🔒 **Policy-Driven Execution**: Validate execution constraints before and after instruction execution
+- 🔀 **Dynamic Routing**: Route execution flow based on policy conditions
+- 📊 **Execution History**: Track all instruction executions with timestamps and I/O
+- 🎯 **LangGraph-Native**: Minimal migration cost from existing LangGraph code
+- 🧩 **Decorator-Based**: Use `@instruction` decorator for lightweight governance
+- 🔓 **Zero Lock-In**: Remove ArbiterOS by removing decorators and policies
+
+## Documentation
+
+Full documentation is available at: [http://127.0.0.1:8000](http://127.0.0.1:8000) (when running locally)
+
+### Build Documentation
+
+```bash
+# Build documentation
+uv run mkdocs build
+
+# Serve documentation locally
+uv run mkdocs serve
+
+# Visit http://127.0.0.1:8000 in your browser
+```
+
+## Installation
+
+```bash
+# Clone repository
+git clone https://github.com/wintertee/ArbiterOS-alpha.git
+cd ArbiterOS-alpha
+
+# Install dependencies
+uv sync
+```
+
+## Testing
+
+```bash
+# Run all tests
+uv run pytest tests/
+
+# Run with coverage
+uv run pytest tests/ --cov=arbiteros_alpha
+```
+
+## Development
+
+See [AGENTS.md](AGENTS.md) for AI development guidelines.
+
+## License
+
+See [LICENSE](LICENSE) file for details.

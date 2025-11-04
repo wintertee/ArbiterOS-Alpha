@@ -10,6 +10,10 @@ dependencies = [
     "pre-commit>=4.3.0",
     "rich>=14.2.0",
     "pytest>=8.0.0",
+    "mkdocs>=1.6.1",
+    "mkdocs-material>=9.6.23",
+    "mkdocstrings>=0.30.1",
+    "mkdocstrings-python>=1.18.2",
 ]
 
 [[tool.uv.index]]
