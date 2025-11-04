@@ -5,7 +5,10 @@ from langgraph.graph import END, START, StateGraph
 from rich.logging import RichHandler
 
 from arbiteros_alpha import ArbiterOSAlpha
-from arbiteros_alpha.policy import ConfidencePolicyRouter, HistoryPolicyChecker
+from arbiteros_alpha.policy import HistoryPolicyChecker, MetricThresholdPolicyRouter
+
+logger = logging.getLogger(__name__)
+
 
 logging.basicConfig(
     level=logging.DEBUG,
@@ -17,13 +20,16 @@ logging.basicConfig(
 os = ArbiterOSAlpha()
 
 # Policy: Prevent direct generate->toolcall without proper flow
-history_checker = HistoryPolicyChecker().add_blacklist(
-    name="no_direct_toolcall", sequence=["generate", "toolcall"]
+history_checker = HistoryPolicyChecker(
+    name="no_direct_toolcall", bad_sequence=["generate", "toolcall"]
 )
 
 # Policy: If confidence is low, regenerate the response
-confidence_router = ConfidencePolicyRouter(
-    key="confidence", threshold=0.6, target="generate"
+confidence_router = MetricThresholdPolicyRouter(
+    name="regenerate_on_low_confidence",
+    key="confidence",
+    threshold=0.6,
+    target="generate",
 )
 
 
@@ -97,15 +103,7 @@ initial_state: State = {
     "tool_result": "",
     "confidence": 0.0,
 }
-for chunk in graph.stream(initial_state, stream_mode="values", debug=True):
-    print(f"{chunk}\n")
+for chunk in graph.stream(initial_state, stream_mode="values", debug=False):
+    logger.info(f"Current state: {chunk}\n")
 
-print("=" * 80)
-print("EXECUTION HISTORY")
-print("=" * 80)
-for i, entry in enumerate(os.history, 1):
-    print(f"\n[{i}] Instruction: {entry['instruction']}")
-    print(f"    Timestamp: {entry['timestamp']}")
-    print(f"    Input:     {entry['input']}")
-    print(f"    Output:    {entry['output']}")
-print("\n" + "=" * 80)
+os.print_history()
