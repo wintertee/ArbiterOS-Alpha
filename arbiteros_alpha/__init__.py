@@ -69,7 +69,7 @@ class ArbiterOSAlpha:
         logger.debug(f"Adding policy router: {router}")
         self.policy_routers.append(router)
 
-    def check_before(self) -> tuple[dict[str, bool], bool]:
+    def _check_before(self) -> tuple[dict[str, bool], bool]:
         """Execute all policy checkers before instruction execution.
 
         Returns:
@@ -87,7 +87,7 @@ class ArbiterOSAlpha:
 
         return results, all(results.values())
 
-    def route_after(self) -> tuple[dict[str, str | None], str | None]:
+    def _route_after(self) -> tuple[dict[str, str | None], str | None]:
         """Determine if execution should be routed to a different node.
 
         Consults all registered policy routers in order. Returns the first
@@ -151,13 +151,13 @@ class ArbiterOSAlpha:
                     )
                 )
 
-                self.history[-1].check_policy_results, all_passed = self.check_before()
+                self.history[-1].check_policy_results, all_passed = self._check_before()
 
                 result = func(*args, **kwargs)
                 logger.debug(f"Instruction {name} returned: {result}")
                 self.history[-1].output_state = result
 
-                self.history[-1].route_policy_results, destination = self.route_after()
+                self.history[-1].route_policy_results, destination = self._route_after()
 
                 if destination:
                     return Command(update=result, goto=destination)

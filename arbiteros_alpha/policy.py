@@ -13,8 +13,8 @@ logger = logging.getLogger(__name__)
 class PolicyChecker(ABC):
     """Abstract base class for policy checkers that validate execution constraints.
 
-    PolicyCheckers enforce constraints before or after instruction execution.
-    Subclasses must implement check_before and check_after methods to define
+    PolicyCheckers enforce constraints before instruction execution.
+    Subclasses must implement check_before method to define
     custom validation logic.
     """
 

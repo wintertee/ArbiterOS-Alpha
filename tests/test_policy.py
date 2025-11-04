@@ -134,9 +134,7 @@ class TestHistoryPolicyChecker:
     def test_check_before_with_three_step_sequence(self):
         """Test blacklisting sequences with more than two steps."""
         # Arrange
-        checker = HistoryPolicyChecker(
-            name="test", bad_sequence=["a", "b", "c"]
-        )
+        checker = HistoryPolicyChecker(name="test", bad_sequence=["a", "b", "c"])
         history = [
             History(
                 timestamp=datetime.datetime.now(),
