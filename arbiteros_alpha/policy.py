@@ -18,7 +18,7 @@ class PolicyChecker(ABC):
     custom validation logic.
     """
 
-    def check_before(self, history: "History") -> bool:
+    def check_before(self, history: list["History"]) -> bool:
         """Validate constraints before instruction execution.
 
         Args:
@@ -41,7 +41,7 @@ class PolicyRouter(ABC):
     the execution flow to a different node based on policy conditions.
     """
 
-    def route_after(self, history: "History") -> str:
+    def route_after(self, history: list["History"]) -> str:
         """Determine the next node to execute based on policy conditions.
 
         Args:
