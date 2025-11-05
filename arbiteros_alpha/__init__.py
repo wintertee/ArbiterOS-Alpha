@@ -11,6 +11,7 @@ from .policy import (
     PolicyChecker,
     PolicyRouter,
 )
+from .utils import print_history
 
 __all__ = [
     "ArbiterOSAlpha",
@@ -19,4 +20,5 @@ __all__ = [
     "PolicyRouter",
     "HistoryPolicyChecker",
     "MetricThresholdPolicyRouter",
+    "print_history",
 ]
