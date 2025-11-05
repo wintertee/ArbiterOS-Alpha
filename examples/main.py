@@ -4,7 +4,7 @@ from typing import TypedDict
 from langgraph.graph import END, START, StateGraph
 from rich.logging import RichHandler
 
-from arbiteros_alpha import ArbiterOSAlpha
+from arbiteros_alpha import ArbiterOSAlpha, print_history
 from arbiteros_alpha.policy import HistoryPolicyChecker, MetricThresholdPolicyRouter
 
 logger = logging.getLogger(__name__)
@@ -106,4 +106,4 @@ initial_state: State = {
 for chunk in graph.stream(initial_state, stream_mode="values", debug=False):
     logger.info(f"Current state: {chunk}\n")
 
-os.print_history()
+print_history(os.history)
