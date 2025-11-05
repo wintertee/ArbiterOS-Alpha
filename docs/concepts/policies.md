@@ -139,7 +139,7 @@ class MetricThresholdPolicyRouter(PolicyRouter):
 
 | Academic Policy Category | Implementation | Timing | Purpose | Example |
 |----------------------|----------------|---------|---------|---------|
-| **Static Verification (Linter)** | `PolicyChecker` | Pre-execution | Validate graph structure | Reject `generate→toolcall` pattern |
+| **Static Verification (Linter)** | TODO | Before-started | Validate graph structure | Reject `generate→toolcall` pattern |
 | **Dynamic Transition Verification (Think then Verify)** | `PolicyChecker` | Pre-execution | Enforce preconditions | Require verification before tool calls |
 | **Stateful Policies** | `PolicyChecker` | Pre-execution | Check state conditions | Block actions for high-risk users |
 | **Temporal Policies** | `PolicyChecker` | Pre-execution | Rate limiting | Limit API calls to 1 per 5 seconds |
