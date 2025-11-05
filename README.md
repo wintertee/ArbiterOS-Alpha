@@ -20,21 +20,6 @@ uv run -m examples.main
 - 🧩 **Decorator-Based**: Use `@instruction` decorator for lightweight governance
 - 🔓 **Zero Lock-In**: Remove ArbiterOS by removing decorators and policies
 
-## Documentation
-
-Full documentation is available at: [http://127.0.0.1:8000](http://127.0.0.1:8000) (when running locally)
-
-### Build Documentation
-
-```bash
-# Build documentation
-uv run mkdocs build
-
-# Serve documentation locally
-uv run mkdocs serve
-
-# Visit http://127.0.0.1:8000 in your browser
-```
 
 ## Installation
 
@@ -51,13 +36,28 @@ uv sync
 
 ```bash
 # Run all tests
-uv run pytest tests/
-
-# Run with coverage
-uv run pytest tests/ --cov=arbiteros_alpha
+uv run pytest
 ```
 
 ## Development
+
+```bash
+# Install with dev dependencies
+uv sync --all-extras
+
+# Setup pre-commit hooks
+uv run pre-commit install
+```
+
+### Build Documentation
+
+```bash
+# Build documentation
+uv run mkdocs build
+
+# Serve documentation locally
+uv run mkdocs serve
+```
 
 See [AGENTS.md](AGENTS.md) for AI development guidelines.
 
