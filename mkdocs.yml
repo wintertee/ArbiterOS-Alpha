@@ -75,6 +75,9 @@ nav:
   - Getting Started:
       - Installation: getting-started/installation.md
       - Quick Start: getting-started/quickstart.md
+      - Migration Guide: getting-started/migration.md
+  - Concepts:
+      - Policy Architecture: concepts/policies.md
   - Tutorial:
       - Complete Example: examples/complete-tutorial.md
   - API Reference:

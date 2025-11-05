@@ -367,81 +367,91 @@ When you run `uv run -m examples.main`, you'll see:
 ================================================================================
 
 [1] generate
-  Timestamp: 2025-11-04 17:30:00.123456
-  ────────────────────────────────────────────────────────────────────────────
+  Timestamp: 2025-11-05 10:12:24.659058
   Input:
     query: What is AI?
     response: ''
     tool_result: ''
     confidence: 0.0
-  ────────────────────────────────────────────────────────────────────────────
   Output:
     response: Short reply.
-  ────────────────────────────────────────────────────────────────────────────
   Policy Checks:
     (none)
-  ────────────────────────────────────────────────────────────────────────────
   Policy Routes:
     (none)
 
 [2] toolcall
-  Timestamp: 2025-11-04 17:30:00.125789
-  ────────────────────────────────────────────────────────────────────────────
+  Timestamp: 2025-11-05 10:12:24.662379
   Input:
     query: What is AI?
     response: Short reply.
     tool_result: ''
     confidence: 0.0
-  ────────────────────────────────────────────────────────────────────────────
   Output:
     tool_result: ok
-  ────────────────────────────────────────────────────────────────────────────
   Policy Checks:
     ✗ no_direct_toolcall
-  ────────────────────────────────────────────────────────────────────────────
   Policy Routes:
     (none)
 
 [3] evaluate
-  Timestamp: 2025-11-04 17:30:00.128012
-  ────────────────────────────────────────────────────────────────────────────
+  Timestamp: 2025-11-05 10:12:24.666841
   Input:
     query: What is AI?
     response: Short reply.
     tool_result: ok
     confidence: 0.0
-  ────────────────────────────────────────────────────────────────────────────
   Output:
     confidence: 0.12
-  ────────────────────────────────────────────────────────────────────────────
   Policy Checks:
     ✗ no_direct_toolcall
-  ────────────────────────────────────────────────────────────────────────────
   Policy Routes:
     → regenerate_on_low_confidence ⇒ generate
 
 [4] generate
-  Timestamp: 2025-11-04 17:30:00.130456
-  ────────────────────────────────────────────────────────────────────────────
+  Timestamp: 2025-11-05 10:12:24.673606
   Input:
     query: What is AI?
     response: Short reply.
     tool_result: ok
     confidence: 0.12
-  ────────────────────────────────────────────────────────────────────────────
   Output:
     response: Here is my comprehensive and detailed response with much more content and
       explanation.
-  ────────────────────────────────────────────────────────────────────────────
   Policy Checks:
     ✗ no_direct_toolcall
-  ────────────────────────────────────────────────────────────────────────────
   Policy Routes:
     (none)
 
 [5] toolcall
+  Timestamp: 2025-11-05 10:12:24.679333
+  Input:
+    query: What is AI?
+    response: Here is my comprehensive and detailed response with much more content and
+      explanation.
+    tool_result: ok
+    confidence: 0.12
+  Output:
+    tool_result: ok
+  Policy Checks:
+    ✗ no_direct_toolcall
+  Policy Routes:
+    (none)
+
 [6] evaluate
-  (confidence: 0.86 - passes threshold, execution completes)
+  Timestamp: 2025-11-05 10:12:24.683659
+  Input:
+    query: What is AI?
+    response: Here is my comprehensive and detailed response with much more content and
+      explanation.
+    tool_result: ok
+    confidence: 0.12
+  Output:
+    confidence: 0.86
+  Policy Checks:
+    ✗ no_direct_toolcall
+  Policy Routes:
+    (none)
 
 ================================================================================
 ```

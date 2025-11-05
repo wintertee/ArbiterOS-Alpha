@@ -61,11 +61,17 @@ def evaluate(state):
 
 - [Installation Guide](getting-started/installation.md)
 - [Quick Start Tutorial](getting-started/quickstart.md)
+- [Migration Guide](getting-started/migration.md)
 - [API Reference](api/core.md)
+
+## Core Concepts
+
+- [Policy Architecture](concepts/policies.md)
 
 ## Documentation Structure
 
 - **Getting Started**: Installation and quick start guides
+- **Concepts**: Core architectural concepts and design patterns
 - **API Reference**: Auto-generated API documentation from code
 - **Examples**: Practical examples and use cases
 - **Development**: Contributing guidelines and testing documentation

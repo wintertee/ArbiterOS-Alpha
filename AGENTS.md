@@ -21,8 +21,6 @@ All code comments and docstrings must follow [Google Python Style Guide](https:/
 
 ### 4. Documentation Requirements
 
-**FOR NOW: DO NOT write documentation in `docs/`**
-
 Focus on code quality, tests, and Google-style docstrings.
 
 ### 5. LangGraph-Native Interface
