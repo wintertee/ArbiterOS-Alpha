@@ -16,3 +16,4 @@ repos:
     # Update the uv lockfile
     - id: uv-lock
     - id: uv-export
+      args: ["--all-extras", "--output-file=requirements.txt", "--quiet"]
