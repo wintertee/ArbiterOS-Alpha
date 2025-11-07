@@ -87,7 +87,7 @@ os = ArbiterOSAlpha()
 os.add_policy_checker(
     HistoryPolicyChecker(
         name="require_verification",
-        bad_sequence="generate,execute"
+        bad_sequence=["generate", "execute"]
     )
 )
 
@@ -356,26 +356,7 @@ graph.add_node("generate", generate)
 - **Governance logic**: Move to policies
 - **Workflow structure**: Keep in LangGraph
 
-### 3. Use Meaningful Names
-```python
-# Good: Clear, descriptive policy names
-os.add_policy_checker(
-    HistoryPolicyChecker(
-        name="enforce_think_then_verify_pattern",
-        bad_sequence="generate,toolcall"
-    )
-)
-
-# Avoid: Generic names
-os.add_policy_checker(
-    HistoryPolicyChecker(
-        name="policy1",  # Not descriptive
-        bad_sequence="generate,toolcall"
-    )
-)
-```
-
-### 4. Test Policies
+### 3. Test Policies
 ```python
 import pytest
 
