@@ -10,7 +10,10 @@ Tests cover:
 import datetime
 from typing import Any
 
+import pytest
+
 from arbiteros_alpha import ArbiterOSAlpha, History
+from arbiteros_alpha.instructions import CognitiveCore, MetacognitiveCore
 from arbiteros_alpha.policy import (
     HistoryPolicyChecker,
     MetricThresholdPolicyRouter,
@@ -34,7 +37,9 @@ class TestArbiterOSAlpha:
         """Test adding a policy checker to the OS."""
         # Arrange
         os = ArbiterOSAlpha()
-        checker = HistoryPolicyChecker(name="test", bad_sequence=["a", "b"])
+        checker = HistoryPolicyChecker(
+            name="test", bad_sequence=[CognitiveCore.GENERATE, CognitiveCore.DECOMPOSE]
+        )
 
         # Act
         os.add_policy_checker(checker)
@@ -47,8 +52,14 @@ class TestArbiterOSAlpha:
         """Test adding multiple policy checkers."""
         # Arrange
         os = ArbiterOSAlpha()
-        checker1 = HistoryPolicyChecker(name="checker1", bad_sequence=["a", "b"])
-        checker2 = HistoryPolicyChecker(name="checker2", bad_sequence=["c", "d"])
+        checker1 = HistoryPolicyChecker(
+            name="checker1",
+            bad_sequence=[CognitiveCore.GENERATE, CognitiveCore.DECOMPOSE],
+        )
+        checker2 = HistoryPolicyChecker(
+            name="checker2",
+            bad_sequence=[CognitiveCore.REFLECT, CognitiveCore.GENERATE],
+        )
 
         # Act
         os.add_policy_checker(checker1)
@@ -110,12 +121,14 @@ class TestArbiterOSAlpha:
         """Test check_before with a checker that passes."""
         # Arrange
         os = ArbiterOSAlpha()
-        checker = HistoryPolicyChecker(name="test", bad_sequence=["a", "b"])
+        checker = HistoryPolicyChecker(
+            name="test", bad_sequence=[CognitiveCore.GENERATE, CognitiveCore.DECOMPOSE]
+        )
         os.add_policy_checker(checker)
         os.history.append(
             History(
                 timestamp=datetime.datetime.now(),
-                instruction="other",
+                instruction=CognitiveCore.REFLECT,
                 input_state={},
                 output_state={},
             )
@@ -132,19 +145,21 @@ class TestArbiterOSAlpha:
         """Test check_before with a checker that fails."""
         # Arrange
         os = ArbiterOSAlpha()
-        checker = HistoryPolicyChecker(name="no_ab", bad_sequence=["a", "b"])
+        checker = HistoryPolicyChecker(
+            name="no_ab", bad_sequence=[CognitiveCore.GENERATE, CognitiveCore.DECOMPOSE]
+        )
         os.add_policy_checker(checker)
         os.history.extend(
             [
                 History(
                     timestamp=datetime.datetime.now(),
-                    instruction="a",
+                    instruction=CognitiveCore.GENERATE,
                     input_state={},
                     output_state={},
                 ),
                 History(
                     timestamp=datetime.datetime.now(),
-                    instruction="b",
+                    instruction=CognitiveCore.DECOMPOSE,
                     input_state={},
                     output_state={},
                 ),
@@ -225,7 +240,7 @@ class TestArbiterOSAlpha:
         # Arrange
         os = ArbiterOSAlpha()
 
-        @os.instruction("test_node")
+        @os.instruction(CognitiveCore.GENERATE)
         def test_func(state: dict[str, Any]) -> dict[str, Any]:
             return {"result": "success"}
 
@@ -234,7 +249,7 @@ class TestArbiterOSAlpha:
 
         # Assert
         assert len(os.history) == 1
-        assert os.history[0].instruction == "test_node"
+        assert os.history[0].instruction == CognitiveCore.GENERATE
         assert os.history[0].input_state == {"input": "data"}
         assert os.history[0].output_state == {"result": "success"}
         assert result == {"result": "success"}
@@ -244,7 +259,7 @@ class TestArbiterOSAlpha:
         # Arrange
         os = ArbiterOSAlpha()
 
-        @os.instruction("test")
+        @os.instruction(CognitiveCore.GENERATE)
         def my_function(state: dict[str, Any]) -> dict[str, Any]:
             return state
 
@@ -255,14 +270,16 @@ class TestArbiterOSAlpha:
         """Test instruction decorator behavior when policy check fails."""
         # Arrange
         os = ArbiterOSAlpha()
-        checker = HistoryPolicyChecker(name="no_ab", bad_sequence=["a", "b"])
+        checker = HistoryPolicyChecker(
+            name="no_ab", bad_sequence=[CognitiveCore.GENERATE, CognitiveCore.REFLECT]
+        )
         os.add_policy_checker(checker)
 
-        @os.instruction("a")
+        @os.instruction(CognitiveCore.GENERATE)
         def func_a(state: dict[str, Any]) -> dict[str, Any]:
             return {"step": "a"}
 
-        @os.instruction("b")
+        @os.instruction(CognitiveCore.REFLECT)
         def func_b(state: dict[str, Any]) -> dict[str, Any]:
             return {"step": "b"}
 
@@ -283,7 +300,7 @@ class TestArbiterOSAlpha:
         )
         os.add_policy_router(router)
 
-        @os.instruction("evaluate")
+        @os.instruction(MetacognitiveCore.EVALUATE_PROGRESS)
         def evaluate(state: dict[str, Any]) -> dict[str, Any]:
             return {"confidence": 0.3}
 
@@ -306,7 +323,7 @@ class TestArbiterOSAlpha:
         )
         os.add_policy_router(router)
 
-        @os.instruction("evaluate")
+        @os.instruction(MetacognitiveCore.EVALUATE_PROGRESS)
         def evaluate(state: dict[str, Any]) -> dict[str, Any]:
             return {"confidence": 0.8}
 
@@ -322,7 +339,7 @@ class TestArbiterOSAlpha:
         # Arrange
         os = ArbiterOSAlpha()
 
-        @os.instruction("test")
+        @os.instruction(CognitiveCore.GENERATE)
         def test_func(state: dict[str, Any]) -> dict[str, Any]:
             return {}
 
@@ -342,15 +359,15 @@ class TestArbiterOSAlpha:
         # Arrange
         os = ArbiterOSAlpha()
 
-        @os.instruction("first")
+        @os.instruction(CognitiveCore.GENERATE)
         def first(state: dict[str, Any]) -> dict[str, Any]:
             return {"step": 1}
 
-        @os.instruction("second")
+        @os.instruction(CognitiveCore.DECOMPOSE)
         def second(state: dict[str, Any]) -> dict[str, Any]:
             return {"step": 2}
 
-        @os.instruction("third")
+        @os.instruction(CognitiveCore.REFLECT)
         def third(state: dict[str, Any]) -> dict[str, Any]:
             return {"step": 3}
 
@@ -361,14 +378,46 @@ class TestArbiterOSAlpha:
 
         # Assert
         assert len(os.history) == 3
-        assert os.history[0].instruction == "first"
-        assert os.history[1].instruction == "second"
-        assert os.history[2].instruction == "third"
+        assert os.history[0].instruction == CognitiveCore.GENERATE
+        assert os.history[1].instruction == CognitiveCore.DECOMPOSE
+        assert os.history[2].instruction == CognitiveCore.REFLECT
         assert (
             os.history[0].timestamp
             <= os.history[1].timestamp
             <= os.history[2].timestamp
         )
+
+    def test_instruction_decorator_rejects_invalid_type(self):
+        """Test that instruction decorator rejects non-InstructionType arguments."""
+        # Arrange
+        os = ArbiterOSAlpha()
+
+        # Act & Assert
+        with pytest.raises(
+            TypeError, match="must be an instance of one of the Core enums"
+        ):
+
+            @os.instruction("invalid_string")  # type: ignore
+            def invalid_func(state: dict[str, Any]) -> dict[str, Any]:
+                return state
+
+    def test_instruction_decorator_rejects_wrong_enum(self):
+        """Test that instruction decorator rejects enums that are not from instructions.py."""
+        # Arrange
+        os = ArbiterOSAlpha()
+        from enum import Enum, auto
+
+        class WrongEnum(Enum):
+            WRONG = auto()
+
+        # Act & Assert
+        with pytest.raises(
+            TypeError, match="must be an instance of one of the Core enums"
+        ):
+
+            @os.instruction(WrongEnum.WRONG)  # type: ignore
+            def invalid_func(state: dict[str, Any]) -> dict[str, Any]:
+                return state
 
 
 class TestHistory:

@@ -27,6 +27,7 @@ class State(TypedDict):
 ```python
 from arbiteros_alpha import ArbiterOSAlpha
 from arbiteros_alpha.policy import HistoryPolicyChecker, MetricThresholdPolicyRouter
+from arbiteros_alpha.instructions import GENERATE, EVALUATE
 
 # Create instance
 os = ArbiterOSAlpha()
@@ -35,7 +36,7 @@ os = ArbiterOSAlpha()
 os.add_policy_checker(
     HistoryPolicyChecker(
         name="no_direct_toolcall",
-        bad_sequence=["generate", "toolcall"]
+        bad_sequence=[GENERATE, TOOL_CALL]
     )
 )
 
@@ -53,13 +54,13 @@ os.add_policy_router(
 ### 3. Define and Decorate Functions
 
 ```python
-@os.instruction("generate")
+@os.instruction(GENERATE)
 def generate(state: State) -> dict:
     """Generate AI response."""
     response = "AI generated response"
     return {"response": response}
 
-@os.instruction("evaluate")
+@os.instruction(EVALUATE)
 def evaluate(state: State) -> dict:
     """Evaluate response quality."""
     confidence = 0.8  # Calculate confidence
@@ -112,7 +113,7 @@ Validates instruction sequences to prevent forbidden patterns:
 ```python
 checker = HistoryPolicyChecker(
     name="my_checker",
-    bad_sequence=["step1", "step2"]  # Prevents step1→step2
+    bad_sequence=[GENERATE, TOOL_CALL]  # Prevents GENERATE→TOOL_CALL
 )
 ```
 

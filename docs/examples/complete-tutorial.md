@@ -24,6 +24,7 @@ from rich.logging import RichHandler
 
 from arbiteros_alpha import ArbiterOSAlpha
 from arbiteros_alpha.policy import HistoryPolicyChecker, MetricThresholdPolicyRouter
+from arbiteros_alpha.instructions import GENERATE, TOOL_CALL, EVALUATE
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +38,7 @@ os = ArbiterOSAlpha()
 
 # Policy: Prevent direct generate->toolcall without proper flow
 history_checker = HistoryPolicyChecker(
-    name="no_direct_toolcall", bad_sequence=["generate", "toolcall"]
+    name="no_direct_toolcall", bad_sequence=[GENERATE, TOOL_CALL]
 )
 
 # Policy: If confidence is low, regenerate the response
@@ -60,7 +61,7 @@ class State(TypedDict):
     confidence: float
 
 # 3. Define Instructions
-@os.instruction("generate")
+@os.instruction(GENERATE)
 def generate(state: State) -> dict:
     """Generate a response to the user query."""
     is_retry = bool(state.get("response"))
@@ -86,14 +87,14 @@ def evaluate(state: State) -> dict:
 
 # 4. Build LangGraph
 builder = StateGraph(State)
-builder.add_node(generate)
-builder.add_node(tool_call)
-builder.add_node(evaluate)
+builder.add_node(GENERATE, generate)
+builder.add_node(TOOL_CALL, tool_call)
+builder.add_node(EVALUATE, evaluate)
 
-builder.add_edge(START, "generate")
-builder.add_edge("generate", "tool_call")
-builder.add_edge("tool_call", "evaluate")
-builder.add_edge("evaluate", END)
+builder.add_edge(START, GENERATE)
+builder.add_edge(GENERATE, TOOL_CALL)
+builder.add_edge(TOOL_CALL, EVALUATE)
+builder.add_edge(EVALUATE, END)
 
 graph = builder.compile()
 
@@ -193,7 +194,7 @@ def generate(state: State) -> dict:
 #### Tool Call Instruction
 
 ```python
-@os.instruction("toolcall")
+@os.instruction(TOOL_CALL)
 def tool_call(state: State) -> dict:
     """Call external tools to enhance the response."""
     return {"tool_result": "ok"}
@@ -208,7 +209,7 @@ def tool_call(state: State) -> dict:
 #### Evaluate Instruction
 
 ```python
-@os.instruction("evaluate")
+@os.instruction(EVALUATE)
 def evaluate(state: State) -> dict:
     """Evaluate confidence in the response quality."""
     response_length = len(state["response"])
@@ -286,35 +287,35 @@ The actual execution follows this path:
 
 ### First Iteration (Low Quality)
 
-1. **`generate` (attempt #1)**
+1. **`GENERATE` (attempt #1)**
    - Input: `{query: "What is AI?", response: "", ...}`
    - Output: `{response: "Short reply."}`
    - Policy Check: ✓ No violations (first call)
 
-2. **`tool_call`**
+2. **`TOOL_CALL`**
    - Input: `{..., response: "Short reply.", ...}`
    - Output: `{tool_result: "ok"}`
-   - Policy Check: ✗ Detects `generate→toolcall` sequence (flagged but continues)
+   - Policy Check: ✗ Detects `GENERATE→TOOL_CALL` sequence (flagged but continues)
 
-3. **`evaluate`**
+3. **`EVALUATE`**
    - Input: `{..., response: "Short reply.", tool_result: "ok", ...}`
    - Output: `{confidence: 0.12}` (13 chars / 100 = 0.13)
-   - Policy Check: ✗ Still has `generate→toolcall` in history
+   - Policy Check: ✗ Still has `GENERATE→TOOL_CALL` in history
    - **Policy Route**: ⚡ **`confidence < 0.6` → Routes to `generate`**
 
 ### Second Iteration (High Quality)
 
-4. **`generate` (attempt #2 - retry)**
+4. **`GENERATE` (attempt #2 - retry)**
    - Input: `{..., response: "Short reply.", ...}` (response exists)
    - Output: `{response: "Here is my comprehensive and detailed response with much more content and explanation."}`
-   - Policy Check: ✗ Still has old `generate→toolcall` in history
+   - Policy Check: ✗ Still has old `GENERATE→TOOL_CALL` in history
 
-5. **`tool_call`**
+5. **`TOOL_CALL`**
    - Input: `{..., response: "Here is my comprehensive...", ...}`
    - Output: `{tool_result: "ok"}`
-   - Policy Check: ✗ Multiple `generate→toolcall` sequences now
+   - Policy Check: ✗ Multiple `GENERATE→TOOL_CALL` sequences now
 
-6. **`evaluate`**
+6. **`EVALUATE`**
    - Input: `{..., response: "Here is my comprehensive...", ...}`
    - Output: `{confidence: 0.86}` (86 chars / 100 = 0.86)
    - Policy Check: ✗ Multiple violations in history
@@ -338,28 +339,28 @@ When you run `uv run -m examples.main`, you'll see:
 ### Console Logs
 
 ```
-[DEBUG] Adding policy checker: HistoryPolicyChecker(name='no_direct_toolcall', bad_sequence='generate->toolcall')
+[DEBUG] Adding policy checker: HistoryPolicyChecker(name='no_direct_toolcall', bad_sequence='GENERATE->TOOL_CALL')
 [DEBUG] Adding policy router: MetricThresholdPolicyRouter(name='regenerate_on_low_confidence', key='confidence', threshold=0.6, target='generate')
 
-[DEBUG] Executing instruction: generate
+[DEBUG] Executing instruction: GENERATE
 [DEBUG] Running 1 policy checkers (before)
-[DEBUG] Instruction generate returned: {'response': 'Short reply.'}
+[DEBUG] Instruction GENERATE returned: {'response': 'Short reply.'}
 [DEBUG] Checking 1 policy routers
 
-[DEBUG] Executing instruction: toolcall
+[DEBUG] Executing instruction: TOOL_CALL
 [DEBUG] Running 1 policy checkers (before)
-[ERROR] Blacklisted sequence detected: no_direct_toolcall:[generate->toolcall] in [generate->toolcall]
+[ERROR] Blacklisted sequence detected: no_direct_toolcall:[GENERATE->TOOL_CALL] in [GENERATE->TOOL_CALL]
 [ERROR] Policy checker HistoryPolicyChecker(...) failed validation.
-[DEBUG] Instruction toolcall returned: {'tool_result': 'ok'}
+[DEBUG] Instruction TOOL_CALL returned: {'tool_result': 'ok'}
 
-[DEBUG] Executing instruction: evaluate
-[DEBUG] Instruction evaluate returned: {'confidence': 0.12}
+[DEBUG] Executing instruction: EVALUATE
+[DEBUG] Instruction EVALUATE returned: {'confidence': 0.12}
 [WARNING] Routing decision made to: generate
 [INFO] Routing from evaluate to generate
 
-[DEBUG] Executing instruction: generate
-[DEBUG] Instruction generate returned: {'response': 'Here is my comprehensive...'}
-[DEBUG] Instruction evaluate returned: {'confidence': 0.86}
+[DEBUG] Executing instruction: GENERATE
+[DEBUG] Instruction GENERATE returned: {'response': 'Here is my comprehensive...'}
+[DEBUG] Instruction EVALUATE returned: {'confidence': 0.86}
 ```
 
 ### Execution History
@@ -368,7 +369,7 @@ When you run `uv run -m examples.main`, you'll see:
 📋 Arbiter OS Execution History
 ================================================================================
 
-[1] generate
+[1] GENERATE
   Timestamp: 2025-11-05 10:12:24.659058
   Input:
     query: What is AI?
@@ -382,7 +383,7 @@ When you run `uv run -m examples.main`, you'll see:
   Policy Routes:
     (none)
 
-[2] toolcall
+[2] TOOL_CALL
   Timestamp: 2025-11-05 10:12:24.662379
   Input:
     query: What is AI?
@@ -396,7 +397,7 @@ When you run `uv run -m examples.main`, you'll see:
   Policy Routes:
     (none)
 
-[3] evaluate
+[3] EVALUATE
   Timestamp: 2025-11-05 10:12:24.666841
   Input:
     query: What is AI?
@@ -410,7 +411,7 @@ When you run `uv run -m examples.main`, you'll see:
   Policy Routes:
     → regenerate_on_low_confidence ⇒ generate
 
-[4] generate
+[4] GENERATE
   Timestamp: 2025-11-05 10:12:24.673606
   Input:
     query: What is AI?
@@ -425,7 +426,7 @@ When you run `uv run -m examples.main`, you'll see:
   Policy Routes:
     (none)
 
-[5] toolcall
+[5] TOOL_CALL
   Timestamp: 2025-11-05 10:12:24.679333
   Input:
     query: What is AI?
@@ -440,7 +441,7 @@ When you run `uv run -m examples.main`, you'll see:
   Policy Routes:
     (none)
 
-[6] evaluate
+[6] EVALUATE
   Timestamp: 2025-11-05 10:12:24.683659
   Input:
     query: What is AI?

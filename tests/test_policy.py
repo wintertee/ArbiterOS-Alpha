@@ -8,6 +8,12 @@ Tests cover:
 import datetime
 
 from arbiteros_alpha import History
+from arbiteros_alpha.instructions import (
+    CognitiveCore,
+    ExecutionCore,
+    MemoryCore,
+    MetacognitiveCore,
+)
 from arbiteros_alpha.policy import HistoryPolicyChecker, MetricThresholdPolicyRouter
 
 
@@ -18,28 +24,30 @@ class TestHistoryPolicyChecker:
         """Test that __post_init__ joins sequence list into string."""
         # Arrange & Act
         checker = HistoryPolicyChecker(
-            name="test_checker", bad_sequence=["generate", "toolcall"]
+            name="test_checker",
+            bad_sequence=[CognitiveCore.GENERATE, ExecutionCore.TOOL_CALL],
         )
 
         # Assert
-        assert checker.bad_sequence == "generate->toolcall"
+        assert checker._bad_sequence_str == "GENERATE->TOOL_CALL"
 
     def test_check_before_passes_when_no_blacklisted_sequence(self):
         """Test that check_before returns True when sequence is not blacklisted."""
         # Arrange
         checker = HistoryPolicyChecker(
-            name="no_direct_toolcall", bad_sequence=["generate", "toolcall"]
+            name="no_direct_toolcall",
+            bad_sequence=[CognitiveCore.GENERATE, ExecutionCore.TOOL_CALL],
         )
         history = [
             History(
                 timestamp=datetime.datetime.now(),
-                instruction="generate",
+                instruction=CognitiveCore.GENERATE,
                 input_state={},
                 output_state={},
             ),
             History(
                 timestamp=datetime.datetime.now(),
-                instruction="evaluate",
+                instruction=MetacognitiveCore.EVALUATE_PROGRESS,
                 input_state={},
                 output_state={},
             ),
@@ -55,18 +63,19 @@ class TestHistoryPolicyChecker:
         """Test that check_before returns False when blacklisted sequence is found."""
         # Arrange
         checker = HistoryPolicyChecker(
-            name="no_direct_toolcall", bad_sequence=["generate", "toolcall"]
+            name="no_direct_toolcall",
+            bad_sequence=[CognitiveCore.GENERATE, ExecutionCore.TOOL_CALL],
         )
         history = [
             History(
                 timestamp=datetime.datetime.now(),
-                instruction="generate",
+                instruction=CognitiveCore.GENERATE,
                 input_state={},
                 output_state={},
             ),
             History(
                 timestamp=datetime.datetime.now(),
-                instruction="toolcall",
+                instruction=ExecutionCore.TOOL_CALL,
                 input_state={},
                 output_state={},
             ),
@@ -82,30 +91,31 @@ class TestHistoryPolicyChecker:
         """Test that blacklisted sequences are detected in the middle of history."""
         # Arrange
         checker = HistoryPolicyChecker(
-            name="test", bad_sequence=["generate", "toolcall"]
+            name="test",
+            bad_sequence=[CognitiveCore.GENERATE, ExecutionCore.TOOL_CALL],
         )
         history = [
             History(
                 timestamp=datetime.datetime.now(),
-                instruction="start",
+                instruction=MemoryCore.LOAD,
                 input_state={},
                 output_state={},
             ),
             History(
                 timestamp=datetime.datetime.now(),
-                instruction="generate",
+                instruction=CognitiveCore.GENERATE,
                 input_state={},
                 output_state={},
             ),
             History(
                 timestamp=datetime.datetime.now(),
-                instruction="toolcall",
+                instruction=ExecutionCore.TOOL_CALL,
                 input_state={},
                 output_state={},
             ),
             History(
                 timestamp=datetime.datetime.now(),
-                instruction="end",
+                instruction=ExecutionCore.RESPOND,
                 input_state={},
                 output_state={},
             ),
@@ -121,7 +131,8 @@ class TestHistoryPolicyChecker:
         """Test check_before with empty history returns True."""
         # Arrange
         checker = HistoryPolicyChecker(
-            name="test", bad_sequence=["generate", "toolcall"]
+            name="test",
+            bad_sequence=[CognitiveCore.GENERATE, ExecutionCore.TOOL_CALL],
         )
         history = []
 
@@ -134,23 +145,30 @@ class TestHistoryPolicyChecker:
     def test_check_before_with_three_step_sequence(self):
         """Test blacklisting sequences with more than two steps."""
         # Arrange
-        checker = HistoryPolicyChecker(name="test", bad_sequence=["a", "b", "c"])
+        checker = HistoryPolicyChecker(
+            name="test",
+            bad_sequence=[
+                CognitiveCore.GENERATE,
+                MemoryCore.LOAD,
+                ExecutionCore.TOOL_CALL,
+            ],
+        )
         history = [
             History(
                 timestamp=datetime.datetime.now(),
-                instruction="a",
+                instruction=CognitiveCore.GENERATE,
                 input_state={},
                 output_state={},
             ),
             History(
                 timestamp=datetime.datetime.now(),
-                instruction="b",
+                instruction=MemoryCore.LOAD,
                 input_state={},
                 output_state={},
             ),
             History(
                 timestamp=datetime.datetime.now(),
-                instruction="c",
+                instruction=ExecutionCore.TOOL_CALL,
                 input_state={},
                 output_state={},
             ),
@@ -178,7 +196,7 @@ class TestMetricThresholdPolicyRouter:
         history = [
             History(
                 timestamp=datetime.datetime.now(),
-                instruction="evaluate",
+                instruction=MetacognitiveCore.EVALUATE_PROGRESS,
                 input_state={},
                 output_state={"confidence": 0.4},
             )
@@ -202,7 +220,7 @@ class TestMetricThresholdPolicyRouter:
         history = [
             History(
                 timestamp=datetime.datetime.now(),
-                instruction="evaluate",
+                instruction=MetacognitiveCore.EVALUATE_PROGRESS,
                 input_state={},
                 output_state={"confidence": 0.8},
             )
@@ -223,7 +241,7 @@ class TestMetricThresholdPolicyRouter:
         history = [
             History(
                 timestamp=datetime.datetime.now(),
-                instruction="evaluate",
+                instruction=MetacognitiveCore.EVALUATE_PROGRESS,
                 input_state={},
                 output_state={"confidence": 0.6},
             )
@@ -244,7 +262,7 @@ class TestMetricThresholdPolicyRouter:
         history = [
             History(
                 timestamp=datetime.datetime.now(),
-                instruction="evaluate",
+                instruction=MetacognitiveCore.EVALUATE_PROGRESS,
                 input_state={},
                 output_state={},  # No confidence key
             )
@@ -265,7 +283,7 @@ class TestMetricThresholdPolicyRouter:
         history = [
             History(
                 timestamp=datetime.datetime.now(),
-                instruction="check",
+                instruction=MetacognitiveCore.MONITOR_RESOURCES,
                 input_state={},
                 output_state={"quality_score": 0.5},
             )
@@ -286,13 +304,13 @@ class TestMetricThresholdPolicyRouter:
         history = [
             History(
                 timestamp=datetime.datetime.now(),
-                instruction="first",
+                instruction=CognitiveCore.GENERATE,
                 input_state={},
                 output_state={"confidence": 0.3},  # Below threshold
             ),
             History(
                 timestamp=datetime.datetime.now(),
-                instruction="second",
+                instruction=MetacognitiveCore.EVALUATE_PROGRESS,
                 input_state={},
                 output_state={"confidence": 0.9},  # Above threshold
             ),

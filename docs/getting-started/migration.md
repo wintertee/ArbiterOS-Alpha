@@ -74,6 +74,7 @@ from typing import TypedDict
 # Change 1: Import ArbiterOS
 from arbiteros_alpha import ArbiterOSAlpha
 from arbiteros_alpha.policy import HistoryPolicyChecker, MetricThresholdPolicyRouter
+from arbiteros_alpha.instructions import GENERATE, VERIFY, EXECUTE
 
 class State(TypedDict):
     query: str
@@ -87,7 +88,7 @@ os = ArbiterOSAlpha()
 os.add_policy_checker(
     HistoryPolicyChecker(
         name="require_verification",
-        bad_sequence=["generate", "execute"]
+        bad_sequence=[GENERATE, EXECUTE]
     )
 )
 
@@ -102,7 +103,7 @@ os.add_policy_router(
 )
 
 # Change 3: Add @os.instruction decorator to functions
-@os.instruction("generate")
+@os.instruction(GENERATE)
 def generate(state: State) -> State:
     """Generate AI response."""
     return {
@@ -110,12 +111,12 @@ def generate(state: State) -> State:
         "confidence": 0.85
     }
 
-@os.instruction("verify")
+@os.instruction(VERIFY)
 def verify(state: State) -> State:
     """Verify response quality."""
     return state
 
-@os.instruction("execute")
+@os.instruction(EXECUTE)
 def execute(state: State) -> State:
     """Execute the action."""
     return state
@@ -277,7 +278,7 @@ class RiskPolicyChecker(PolicyChecker):
 os.add_policy_checker(RiskPolicyChecker(name="risk_check"))
 
 # Function is now cleaner
-@os.instruction("execute")
+@os.instruction(EXECUTE)
 def execute(state: State) -> State:
     # Only business logic - no guards needed
     return perform_action(state)
@@ -334,7 +335,7 @@ Your original LangGraph code will work exactly as before:
 
 ```python
 # Remove decorators
-# @os.instruction("generate")  ← Remove this
+# @os.instruction(GENERATE)  ← Remove this
 def generate(state: State) -> State:
     return {"response": "AI response"}
 

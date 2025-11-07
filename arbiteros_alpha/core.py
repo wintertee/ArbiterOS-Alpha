@@ -12,6 +12,7 @@ from typing import Any, Callable
 
 from langgraph.types import Command
 
+from .instructions import InstructionType
 from .policy import PolicyChecker, PolicyRouter
 
 logger = logging.getLogger(__name__)
@@ -19,10 +20,19 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class History:
-    """The minimal OS metadata for tracking instruction execution."""
+    """The minimal OS metadata for tracking instruction execution.
+
+    Attributes:
+        timestamp: When the instruction was executed.
+        instruction: The instruction type that was executed.
+        input_state: The state passed to the instruction.
+        output_state: The state returned by the instruction.
+        check_policy_results: Results of policy checkers (name -> passed/failed).
+        route_policy_results: Results of policy routers (name -> target or None).
+    """
 
     timestamp: datetime.datetime
-    instruction: str
+    instruction: InstructionType
     input_state: dict[str, Any]
     output_state: dict[str, Any] = field(default_factory=dict)
     check_policy_results: dict[str, bool] = field(default_factory=dict)
@@ -123,7 +133,9 @@ class ArbiterOSAlpha:
             logger.warning(f"Router {used_router} decision made to: {destination}")
         return results, destination
 
-    def instruction(self, name: str) -> Callable[[Callable], Callable]:
+    def instruction(
+        self, instruction_type: InstructionType
+    ) -> Callable[[Callable], Callable]:
         """Decorator to wrap LangGraph node functions with policy governance.
 
         This decorator adds policy validation, execution history tracking,
@@ -131,27 +143,37 @@ class ArbiterOSAlpha:
         integration point between ArbiterOS and LangGraph.
 
         Args:
-            name: A unique identifier for this instruction/node.
+            instruction_type: An instruction type from one of the Core enums
+                (CognitiveCore, MemoryCore, ExecutionCore, NormativeCore,
+                MetacognitiveCore, AdaptiveCore, SocialCore, or AffectiveCore).
 
         Returns:
             A decorator function that wraps the target node function.
 
         Example:
-            >>> @os.instruction("generate")
+            >>> from arbiteros_alpha.instructions import CognitiveCore
+            >>> @os.instruction(CognitiveCore.GENERATE)
             ... def generate(state: State) -> State:
             ...     return {"field": "value"}
             >>> # Function now includes policy checks and history tracking
         """
+        # Validate that instruction_type is a valid InstructionType enum
+        if not isinstance(instruction_type, InstructionType.__args__):
+            raise TypeError(
+                f"instruction_type must be an instance of one of the Core enums, got {type(instruction_type)}"
+            )
 
         def decorator(func: Callable) -> Callable:
             @functools.wraps(func)
             def wrapper(*args, **kwargs) -> Any:
-                logger.debug(f"Executing instruction: {name}")
+                logger.debug(
+                    f"Executing instruction: {instruction_type.__class__.__name__}.{instruction_type.name}"
+                )
 
                 self.history.append(
                     History(
                         timestamp=datetime.datetime.now(),
-                        instruction=name,
+                        instruction=instruction_type,
                         input_state=args[0],
                     )
                 )
@@ -159,7 +181,7 @@ class ArbiterOSAlpha:
                 self.history[-1].check_policy_results, all_passed = self._check_before()
 
                 result = func(*args, **kwargs)
-                logger.debug(f"Instruction {name} returned: {result}")
+                logger.debug(f"Instruction {instruction_type.name} returned: {result}")
                 self.history[-1].output_state = result
 
                 self.history[-1].route_policy_results, destination = self._route_after()

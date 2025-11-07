@@ -82,4 +82,5 @@ nav:
       - Complete Example: examples/complete-tutorial.md
   - API Reference:
       - Core: api/core.md
+      - Instructions: api/instructions.md
       - Policy: api/policy.md

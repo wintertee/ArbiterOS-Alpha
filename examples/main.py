@@ -4,6 +4,7 @@ from typing import TypedDict
 from langgraph.graph import END, START, StateGraph
 from rich.logging import RichHandler
 
+import arbiteros_alpha.instructions as Instr
 from arbiteros_alpha import ArbiterOSAlpha, print_history
 from arbiteros_alpha.policy import HistoryPolicyChecker, MetricThresholdPolicyRouter
 
@@ -21,7 +22,8 @@ os = ArbiterOSAlpha()
 
 # Policy: Prevent direct generate->toolcall without proper flow
 history_checker = HistoryPolicyChecker(
-    name="no_direct_toolcall", bad_sequence=["generate", "toolcall"]
+    name="no_direct_toolcall",
+    bad_sequence=[Instr.GENERATE, Instr.TOOL_CALL],
 )
 
 # Policy: If confidence is low, regenerate the response
@@ -49,7 +51,7 @@ class State(TypedDict):
     confidence: float
 
 
-@os.instruction("generate")
+@os.instruction(Instr.GENERATE)
 def generate(state: State) -> State:
     """Generate a response to the user query."""
 
@@ -66,13 +68,13 @@ def generate(state: State) -> State:
     return {"response": response}
 
 
-@os.instruction("toolcall")
+@os.instruction(Instr.TOOL_CALL)
 def tool_call(state: State) -> State:
     """Call external tools to enhance the response."""
     return {"tool_result": "ok"}
 
 
-@os.instruction("evaluate")
+@os.instruction(Instr.EVALUATE_PROGRESS)
 def evaluate(state: State) -> State:
     """Evaluate confidence in the response quality."""
     # Heuristic: response quality based on length

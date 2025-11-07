@@ -3,6 +3,8 @@ from abc import ABC
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+from .instructions import InstructionType
+
 if TYPE_CHECKING:
     from . import History
 
@@ -61,16 +63,20 @@ class HistoryPolicyChecker(PolicyChecker):
     by maintaining a blacklist of forbidden instruction chains.
 
     Example:
-        >>> checker = HistoryPolicyChecker("no_direct_toolcall", ["generate", "toolcall"])
-        >>> # This will raise RuntimeError if "generate" is followed by "toolcall"
+        >>> from arbiteros_alpha.instructions import CognitiveCore, ExecutionCore
+        >>> checker = HistoryPolicyChecker(
+        ...     "no_direct_toolcall",
+        ...     [CognitiveCore.GENERATE, ExecutionCore.TOOL_CALL]
+        ... )
+        >>> # This will raise RuntimeError if GENERATE is followed by TOOL_CALL
     """
 
     name: str
-    bad_sequence: list[str]
+    bad_sequence: list[InstructionType]
 
     def __post_init__(self):
         """Convert sequence list to string representation after initialization."""
-        self.bad_sequence = "->".join(self.bad_sequence)
+        self._bad_sequence_str = "->".join(instr.name for instr in self.bad_sequence)
 
     def check_before(self, history: list["History"]) -> bool:
         """Check if the current history contains any blacklisted sequences.
@@ -84,10 +90,10 @@ class HistoryPolicyChecker(PolicyChecker):
         Raises:
             RuntimeError: If a blacklisted sequence is detected in the history.
         """
-        history_sequence = "->".join(entry.instruction for entry in history)
-        if self.bad_sequence in history_sequence:
+        history_sequence = "->".join(entry.instruction.name for entry in history)
+        if self._bad_sequence_str in history_sequence:
             logger.debug(
-                f"Blacklisted sequence detected: {self.name}:[{self.bad_sequence}] in [{history_sequence}]"
+                f"Blacklisted sequence detected: {self.name}:[{self._bad_sequence_str}] in [{history_sequence}]"
             )
             return False
 
