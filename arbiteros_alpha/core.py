@@ -43,7 +43,7 @@ class ArbiterOSAlpha:
 
     Example:
         >>> os = ArbiterOSAlpha()
-        >>> os.add_policy_checker(HistoryPolicyChecker().add_blacklist("rule", ["a", "b"]))
+        >>> os.add_policy_checker(HistoryPolicyChecker("require_verification",["generate", "execute"]))
         >>> os.add_policy_router(ConfidencePolicyRouter("confidence", 0.5, "retry"))
         >>> @os.instruction("generate")
         ... def generate(state): return {"result": "output"}
