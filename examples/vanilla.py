@@ -26,7 +26,7 @@ history_checker = HistoryPolicyChecker(
 )
 
 
-# if add this checker, intended error will be raised
+# if you add this checker, intended error will be raised
 os.add_policy_checker(history_checker)
 
 # 2. basic modules
