@@ -6,7 +6,8 @@ from rich.logging import RichHandler
 
 import arbiteros_alpha.instructions as Instr
 from arbiteros_alpha import ArbiterOSAlpha, print_history
-from arbiteros_alpha.policy import HistoryPolicyChecker, MetricThresholdPolicyRouter
+# Policies are now loaded from YAML files via os.load_policies()
+# No need to import policy classes unless defining custom policies programmatically
 
 logger = logging.getLogger(__name__)
 
@@ -20,25 +21,12 @@ logging.basicConfig(
 
 os = ArbiterOSAlpha()
 
-# Policy: Prevent direct generate->toolcall without proper flow
-history_checker = HistoryPolicyChecker(
-    name="no_direct_toolcall",
-    bad_sequence=[Instr.GENERATE, Instr.TOOL_CALL],
-)
-
-# Policy: If confidence is low, regenerate the response
-confidence_router = MetricThresholdPolicyRouter(
-    name="regenerate_on_low_confidence",
-    key="confidence",
-    threshold=0.6,
-    target="generate",
-)
-
-
-# if add this checker, intended error will be raised
-os.add_policy_checker(history_checker)
-os.add_policy_router(confidence_router)
-
+# Load policies from YAML files
+# This loads both kernel policies (read-only) and custom policies (developer-defined)
+# Policies are defined in:
+# - arbiteros_alpha/kernel_policy_list.yaml (kernel-defined, read-only)
+# - examples/custom_policy_list.yaml (developer-defined, can be modified)
+os.load_policies()
 # 2. Langgraph stuff
 
 
@@ -95,9 +83,20 @@ builder.add_edge("generate", "tool_call")
 builder.add_edge("tool_call", "evaluate")
 builder.add_edge("evaluate", END)
 
+# 3. Validate graph structure before execution
+# This will raise RuntimeError if graph violates blacklist rules
+# Edges are automatically extracted from the graph object
+try:
+    os.validate_graph_structure(builder)  # Pass graph directly, edges extracted automatically
+    print("Graph structure validation passed!\n")
+except RuntimeError as e:
+    print(f"Graph structure validation failed: {e}\n")
+    # Uncomment the following line to exit on validation failure
+    # raise
+
 graph = builder.compile()
 
-# 3. Run graph
+# 4. Run graph
 
 initial_state: State = {
     "query": "What is AI?",

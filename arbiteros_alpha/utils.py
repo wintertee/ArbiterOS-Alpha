@@ -32,8 +32,13 @@ def print_history(history: list[History]) -> None:
         check_results = entry.check_policy_results
         route_results = entry.route_policy_results
 
-        # Header with instruction name
-        console.print(f"\n[bold cyan][{i}] {entry.instruction.name}[/bold cyan]")
+        # Header with instruction name and node name
+        # Format: [N] INSTRUCTION_NAME - node_name
+        instruction_name = entry.instruction.name
+        node_name = entry.node_name
+        console.print(
+            f"\n[bold cyan][{i}] {instruction_name} - {node_name}[/bold cyan]"
+        )
         console.print(f"[dim]  Timestamp: {entry.timestamp}[/dim]")
 
         # Format input state as YAML

@@ -42,12 +42,14 @@ class TestHistoryPolicyChecker:
             History(
                 timestamp=datetime.datetime.now(),
                 instruction=CognitiveCore.GENERATE,
+                node_name="generate",
                 input_state={},
                 output_state={},
             ),
             History(
                 timestamp=datetime.datetime.now(),
                 instruction=MetacognitiveCore.EVALUATE_PROGRESS,
+                node_name="evaluate_progress",
                 input_state={},
                 output_state={},
             ),
@@ -70,12 +72,14 @@ class TestHistoryPolicyChecker:
             History(
                 timestamp=datetime.datetime.now(),
                 instruction=CognitiveCore.GENERATE,
+                node_name="generate",
                 input_state={},
                 output_state={},
             ),
             History(
                 timestamp=datetime.datetime.now(),
                 instruction=ExecutionCore.TOOL_CALL,
+                node_name="tool_call",
                 input_state={},
                 output_state={},
             ),
@@ -98,24 +102,28 @@ class TestHistoryPolicyChecker:
             History(
                 timestamp=datetime.datetime.now(),
                 instruction=MemoryCore.LOAD,
+                node_name="load",
                 input_state={},
                 output_state={},
             ),
             History(
                 timestamp=datetime.datetime.now(),
                 instruction=CognitiveCore.GENERATE,
+                node_name="generate",
                 input_state={},
                 output_state={},
             ),
             History(
                 timestamp=datetime.datetime.now(),
                 instruction=ExecutionCore.TOOL_CALL,
+                node_name="tool_call",
                 input_state={},
                 output_state={},
             ),
             History(
                 timestamp=datetime.datetime.now(),
                 instruction=ExecutionCore.RESPOND,
+                node_name="respond",
                 input_state={},
                 output_state={},
             ),
@@ -157,18 +165,21 @@ class TestHistoryPolicyChecker:
             History(
                 timestamp=datetime.datetime.now(),
                 instruction=CognitiveCore.GENERATE,
+                node_name="generate",
                 input_state={},
                 output_state={},
             ),
             History(
                 timestamp=datetime.datetime.now(),
                 instruction=MemoryCore.LOAD,
+                node_name="load",
                 input_state={},
                 output_state={},
             ),
             History(
                 timestamp=datetime.datetime.now(),
                 instruction=ExecutionCore.TOOL_CALL,
+                node_name="tool_call",
                 input_state={},
                 output_state={},
             ),
@@ -197,6 +208,7 @@ class TestMetricThresholdPolicyRouter:
             History(
                 timestamp=datetime.datetime.now(),
                 instruction=MetacognitiveCore.EVALUATE_PROGRESS,
+                node_name="evaluate_progress",
                 input_state={},
                 output_state={"confidence": 0.4},
             )
@@ -221,6 +233,7 @@ class TestMetricThresholdPolicyRouter:
             History(
                 timestamp=datetime.datetime.now(),
                 instruction=MetacognitiveCore.EVALUATE_PROGRESS,
+                node_name="evaluate_progress",
                 input_state={},
                 output_state={"confidence": 0.8},
             )
@@ -242,6 +255,7 @@ class TestMetricThresholdPolicyRouter:
             History(
                 timestamp=datetime.datetime.now(),
                 instruction=MetacognitiveCore.EVALUATE_PROGRESS,
+                node_name="evaluate_progress",
                 input_state={},
                 output_state={"confidence": 0.6},
             )
@@ -263,6 +277,7 @@ class TestMetricThresholdPolicyRouter:
             History(
                 timestamp=datetime.datetime.now(),
                 instruction=MetacognitiveCore.EVALUATE_PROGRESS,
+                node_name="evaluate_progress",
                 input_state={},
                 output_state={},  # No confidence key
             )
@@ -284,6 +299,7 @@ class TestMetricThresholdPolicyRouter:
             History(
                 timestamp=datetime.datetime.now(),
                 instruction=MetacognitiveCore.MONITOR_RESOURCES,
+                node_name="monitor_resources",
                 input_state={},
                 output_state={"quality_score": 0.5},
             )
@@ -305,12 +321,14 @@ class TestMetricThresholdPolicyRouter:
             History(
                 timestamp=datetime.datetime.now(),
                 instruction=CognitiveCore.GENERATE,
+                node_name="generate",
                 input_state={},
                 output_state={"confidence": 0.3},  # Below threshold
             ),
             History(
                 timestamp=datetime.datetime.now(),
                 instruction=MetacognitiveCore.EVALUATE_PROGRESS,
+                node_name="evaluate_progress",
                 input_state={},
                 output_state={"confidence": 0.9},  # Above threshold
             ),

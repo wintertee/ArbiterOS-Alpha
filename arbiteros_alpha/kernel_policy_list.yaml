@@ -1,0 +1,30 @@
+# Kernel Policy List
+# This file contains policies defined by the kernel itself.
+# These policies are read-only and cannot be modified by developers.
+# They provide core governance rules that ensure system safety and reliability.
+
+# Policy checkers validate execution constraints before instruction execution
+policy_checkers:
+  # Example: Prevent skipping verification steps
+  # - type: HistoryPolicyChecker
+  #   name: no_skip_verification
+  #   bad_sequence: [GENERATE, TOOL_CALL]
+
+# Policy routers dynamically route execution flow based on conditions
+policy_routers:
+  # Example: Route to retry when confidence is low
+  # - type: MetricThresholdPolicyRouter
+  #   name: retry_on_low_confidence
+  #   key: confidence
+  #   threshold: 0.5
+  #   target: regenerate
+
+# Graph structure checkers validate graph structure before execution
+graph_structure_checkers:
+  # Example: Ensure proper flow structure
+  # - type: GraphStructurePolicyChecker
+  #   blacklists:
+  #     - name: no_direct_execute_without_reason
+  #       sequence: [TOOL_CALL, TOOL_CALL]
+  #       level: error
+

@@ -1,0 +1,22 @@
+graph TD
+    End[End]:::endNode
+    Start[Start]:::startNode
+    decide_finish["decide_finish<br/>(Evaluate Progress)"]
+    execute["execute<br/>(Tool Call)"]
+    orchestrate["orchestrate<br/>(Generate)"]
+    perceive["perceive<br/>(Tool Call)"]
+    plan["plan<br/>(Generate)"]
+    reason["reason<br/>(Generate)"]
+    report["report<br/>(Generate)"]
+    report --> End
+    execute --> orchestrate
+    Start --> plan
+    plan --> orchestrate
+    reason --> decide_finish
+    perceive --> reason
+    orchestrate --> report
+    orchestrate --> perceive
+    decide_finish --> execute
+    decide_finish --> perceive
+    classDef startNode fill:#90EE90,stroke:#333,stroke-width:2px
+    classDef endNode fill:#FFB6C1,stroke:#333,stroke-width:2px

@@ -129,6 +129,7 @@ class TestArbiterOSAlpha:
             History(
                 timestamp=datetime.datetime.now(),
                 instruction=CognitiveCore.REFLECT,
+                node_name="reflect",
                 input_state={},
                 output_state={},
             )
@@ -154,12 +155,14 @@ class TestArbiterOSAlpha:
                 History(
                     timestamp=datetime.datetime.now(),
                     instruction=CognitiveCore.GENERATE,
+                    node_name="generate",
                     input_state={},
                     output_state={},
                 ),
                 History(
                     timestamp=datetime.datetime.now(),
                     instruction=CognitiveCore.DECOMPOSE,
+                    node_name="decompose",
                     input_state={},
                     output_state={},
                 ),
@@ -198,6 +201,7 @@ class TestArbiterOSAlpha:
             History(
                 timestamp=datetime.datetime.now(),
                 instruction="evaluate",
+                node_name="evaluate",
                 input_state={},
                 output_state={"confidence": 0.8},
             )
@@ -222,6 +226,7 @@ class TestArbiterOSAlpha:
             History(
                 timestamp=datetime.datetime.now(),
                 instruction="evaluate",
+                node_name="evaluate",
                 input_state={},
                 output_state={"confidence": 0.3},
             )
@@ -430,6 +435,7 @@ class TestHistory:
         history = History(
             timestamp=timestamp,
             instruction="test",
+            node_name="test_function",
             input_state={"key": "value"},
         )
 
@@ -448,6 +454,7 @@ class TestHistory:
         history = History(
             timestamp=timestamp,
             instruction="test",
+            node_name="test_function",
             input_state={"in": "data"},
             output_state={"out": "result"},
             check_policy_results={"checker1": True},

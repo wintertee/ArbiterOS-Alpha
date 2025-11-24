@@ -1,0 +1,55 @@
+# Custom Policy List
+# This file contains policies defined by developers.
+# Developers can add new policies here to extend or customize governance.
+# Custom policies are loaded after kernel policies and both are applied.
+
+# Policy checkers validate execution constraints before instruction execution
+policy_checkers:
+  # Example: Prevent skipping from GENERATE directly to TOOL_CALL
+  - type: HistoryPolicyChecker
+    name: no_skip_to_execute
+    bad_sequence: [GENERATE, TOOL_CALL]
+  
+  # Example from toy.py: Prevent direct generate->toolcall without proper flow
+  - type: HistoryPolicyChecker
+    name: no_direct_toolcall
+    bad_sequence: [GENERATE, TOOL_CALL]
+
+# Policy routers dynamically route execution flow based on conditions
+policy_routers:
+  # Example: Route back to reason node when confidence is low (for GUI example)
+  - type: MetricThresholdPolicyRouter
+    name: revisit_reason_when_low_confidence
+    key: confidence
+    threshold: 0.7
+    target: reason
+  
+  # Example from toy.py: If confidence is low, regenerate the response
+  - type: MetricThresholdPolicyRouter
+    name: regenerate_on_low_confidence
+    key: confidence
+    threshold: 0.6
+    target: generate
+
+# Graph structure checkers validate graph structure before execution
+graph_structure_checkers:
+  # Example: Multiple blacklist rules for graph structure validation (for GUI example)
+  - type: GraphStructurePolicyChecker
+    blacklists:
+      - name: no_direct_execute_without_reason
+        sequence: [TOOL_CALL, TOOL_CALL]
+        level: error
+      - name: no_skip_to_execute
+        sequence: [GENERATE, TOOL_CALL]
+        level: error
+      - name: multiple_generate_in_a_row
+        sequence: [GENERATE, GENERATE]
+        level: warning
+  
+  # Example from toy.py: Prevent direct toolcall sequence
+  - type: GraphStructurePolicyChecker
+    blacklists:
+      - name: no_direct_toolcall
+        sequence: [GENERATE, TOOL_CALL]
+        level: error
+
