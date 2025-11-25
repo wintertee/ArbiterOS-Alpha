@@ -1,0 +1,21 @@
+# Finance Agent Policy List
+#
+# These routers are specific to the finance trading example. They ensure the graph
+# re-fetches data when vendors disagree, debate summaries stay structured, and
+# risk review happens with fresh telemetry. Kernel-level policies remain unchanged.
+
+policy_routers:
+  # Force continued debate if structured summary confidence is low
+  - type: MetricThresholdPolicyRouter
+    name: redo_research_when_summary_weak
+    key: research_summary_quality
+    threshold: 0.8
+    target: research_debate
+
+  # Prevent risk manager from acting on unverified trade plans
+  - type: MetricThresholdPolicyRouter
+    name: route_back_when_plan_invalid
+    key: plan_validity_score
+    threshold: 0.9
+    target: validate_trade_plan
+

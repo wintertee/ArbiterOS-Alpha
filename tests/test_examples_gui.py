@@ -2,7 +2,7 @@
 
 from langgraph.types import Command
 
-from examples import gui
+from examples.GUI_agent import gui
 
 
 def _make_state(**overrides):

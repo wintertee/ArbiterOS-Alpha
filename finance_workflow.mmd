@@ -1,0 +1,27 @@
+graph TD
+    End[End]:::endNode
+    Start[Start]:::startNode
+    bootstrap_state["bootstrap_state<br/>(Load)"]
+    fetch_fundamentals["fetch_fundamentals<br/>(Tool Call)"]
+    fetch_sentiment["fetch_sentiment<br/>(Load)"]
+    fetch_technical["fetch_technical<br/>(Load)"]
+    finalize_decision["finalize_decision<br/>(Respond)"]
+    research_debate["research_debate<br/>(Generate)"]
+    risk_manager["risk_manager<br/>(Constrain)"]
+    synchronize_data["synchronize_data<br/>(Generate)"]
+    trader_node["trader_node<br/>(Generate)"]
+    validate_trade_plan["validate_trade_plan<br/>(Verify)"]
+    fetch_fundamentals --> fetch_technical
+    risk_manager --> finalize_decision
+    fetch_technical --> fetch_sentiment
+    trader_node --> validate_trade_plan
+    Start --> bootstrap_state
+    validate_trade_plan --> risk_manager
+    bootstrap_state --> fetch_fundamentals
+    finalize_decision --> End
+    synchronize_data --> research_debate
+    fetch_sentiment --> synchronize_data
+    research_debate --> research_debate
+    research_debate --> trader_node
+    classDef startNode fill:#90EE90,stroke:#333,stroke-width:2px
+    classDef endNode fill:#FFB6C1,stroke:#333,stroke-width:2px
