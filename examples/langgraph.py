@@ -97,6 +97,8 @@ builder.add_edge("evaluate", END)
 
 graph = builder.compile()
 
+os.register_compiled_graph(graph)
+
 # 3. Run graph
 
 

@@ -129,6 +129,8 @@ orchestrator_worker_builder.add_edge("synthesizer", END)
 # Compile the workflow
 orchestrator_worker = orchestrator_worker_builder.compile()
 
+os.register_compiled_graph(orchestrator_worker)
+
 # Invoke
 state = orchestrator_worker.invoke({"topic": "Create a report on LLM scaling laws"})
 
