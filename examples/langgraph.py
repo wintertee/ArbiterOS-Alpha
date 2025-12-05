@@ -5,7 +5,7 @@ from langgraph.graph import END, START, StateGraph
 from rich.logging import RichHandler
 
 import arbiteros_alpha.instructions as Instr
-from arbiteros_alpha import ArbiterOSAlpha, print_history
+from arbiteros_alpha import ArbiterOSAlpha
 from arbiteros_alpha.policy import HistoryPolicyChecker, MetricThresholdPolicyRouter
 
 logger = logging.getLogger(__name__)
@@ -113,4 +113,4 @@ def main():
 
 if __name__ == "__main__":
     main()
-    print_history(os.history)
+    os.history.pprint()
