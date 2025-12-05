@@ -7,7 +7,8 @@ Tests cover:
 
 import datetime
 
-from arbiteros_alpha import History
+from arbiteros_alpha import HistoryItem
+from arbiteros_alpha.history import History
 from arbiteros_alpha.instructions import (
     CognitiveCore,
     ExecutionCore,
@@ -20,8 +21,8 @@ from arbiteros_alpha.policy import HistoryPolicyChecker, MetricThresholdPolicyRo
 class TestHistoryPolicyChecker:
     """Test cases for HistoryPolicyChecker."""
 
-    def test_init_converts_sequence_to_string(self):
-        """Test that __post_init__ joins sequence list into string."""
+    def test_init_stores_bad_sequence(self):
+        """Test that bad_sequence is stored correctly."""
         # Arrange & Act
         checker = HistoryPolicyChecker(
             name="test_checker",
@@ -29,7 +30,8 @@ class TestHistoryPolicyChecker:
         )
 
         # Assert
-        assert checker._bad_sequence_str == "GENERATE->TOOL_CALL"
+        assert checker.bad_sequence == [CognitiveCore.GENERATE, ExecutionCore.TOOL_CALL]
+        assert len(checker.bad_sequence) == 2
 
     def test_check_before_passes_when_no_blacklisted_sequence(self):
         """Test that check_before returns True when sequence is not blacklisted."""
@@ -38,20 +40,27 @@ class TestHistoryPolicyChecker:
             name="no_direct_toolcall",
             bad_sequence=[CognitiveCore.GENERATE, ExecutionCore.TOOL_CALL],
         )
-        history = [
-            History(
+        history = History()
+        # First superstep: GENERATE
+        history.enter_next_superstep(["generate"])
+        history.add_entry(
+            HistoryItem(
                 timestamp=datetime.datetime.now(),
                 instruction=CognitiveCore.GENERATE,
                 input_state={},
                 output_state={},
-            ),
-            History(
+            )
+        )
+        # Second superstep: EVALUATE_PROGRESS (not TOOL_CALL)
+        history.enter_next_superstep(["evaluate"])
+        history.add_entry(
+            HistoryItem(
                 timestamp=datetime.datetime.now(),
                 instruction=MetacognitiveCore.EVALUATE_PROGRESS,
                 input_state={},
                 output_state={},
-            ),
-        ]
+            )
+        )
 
         # Act
         result = checker.check_before(history)
@@ -66,20 +75,27 @@ class TestHistoryPolicyChecker:
             name="no_direct_toolcall",
             bad_sequence=[CognitiveCore.GENERATE, ExecutionCore.TOOL_CALL],
         )
-        history = [
-            History(
+        history = History()
+        # First superstep: GENERATE
+        history.enter_next_superstep(["generate"])
+        history.add_entry(
+            HistoryItem(
                 timestamp=datetime.datetime.now(),
                 instruction=CognitiveCore.GENERATE,
                 input_state={},
                 output_state={},
-            ),
-            History(
+            )
+        )
+        # Second superstep: TOOL_CALL (blacklisted sequence!)
+        history.enter_next_superstep(["tool_call"])
+        history.add_entry(
+            HistoryItem(
                 timestamp=datetime.datetime.now(),
                 instruction=ExecutionCore.TOOL_CALL,
                 input_state={},
                 output_state={},
-            ),
-        ]
+            )
+        )
 
         # Act
         result = checker.check_before(history)
@@ -94,32 +110,47 @@ class TestHistoryPolicyChecker:
             name="test",
             bad_sequence=[CognitiveCore.GENERATE, ExecutionCore.TOOL_CALL],
         )
-        history = [
-            History(
+        history = History()
+        # First superstep: LOAD
+        history.enter_next_superstep(["load"])
+        history.add_entry(
+            HistoryItem(
                 timestamp=datetime.datetime.now(),
                 instruction=MemoryCore.LOAD,
                 input_state={},
                 output_state={},
-            ),
-            History(
+            )
+        )
+        # Second superstep: GENERATE
+        history.enter_next_superstep(["generate"])
+        history.add_entry(
+            HistoryItem(
                 timestamp=datetime.datetime.now(),
                 instruction=CognitiveCore.GENERATE,
                 input_state={},
                 output_state={},
-            ),
-            History(
+            )
+        )
+        # Third superstep: TOOL_CALL (blacklisted!)
+        history.enter_next_superstep(["tool_call"])
+        history.add_entry(
+            HistoryItem(
                 timestamp=datetime.datetime.now(),
                 instruction=ExecutionCore.TOOL_CALL,
                 input_state={},
                 output_state={},
-            ),
-            History(
+            )
+        )
+        # Fourth superstep: RESPOND
+        history.enter_next_superstep(["respond"])
+        history.add_entry(
+            HistoryItem(
                 timestamp=datetime.datetime.now(),
                 instruction=ExecutionCore.RESPOND,
                 input_state={},
                 output_state={},
-            ),
-        ]
+            )
+        )
 
         # Act
         result = checker.check_before(history)
@@ -134,7 +165,7 @@ class TestHistoryPolicyChecker:
             name="test",
             bad_sequence=[CognitiveCore.GENERATE, ExecutionCore.TOOL_CALL],
         )
-        history = []
+        history = History()
 
         # Act
         result = checker.check_before(history)
@@ -153,26 +184,37 @@ class TestHistoryPolicyChecker:
                 ExecutionCore.TOOL_CALL,
             ],
         )
-        history = [
-            History(
+        history = History()
+        # First superstep: GENERATE
+        history.enter_next_superstep(["generate"])
+        history.add_entry(
+            HistoryItem(
                 timestamp=datetime.datetime.now(),
                 instruction=CognitiveCore.GENERATE,
                 input_state={},
                 output_state={},
-            ),
-            History(
+            )
+        )
+        # Second superstep: LOAD
+        history.enter_next_superstep(["load"])
+        history.add_entry(
+            HistoryItem(
                 timestamp=datetime.datetime.now(),
                 instruction=MemoryCore.LOAD,
                 input_state={},
                 output_state={},
-            ),
-            History(
+            )
+        )
+        # Third superstep: TOOL_CALL
+        history.enter_next_superstep(["tool_call"])
+        history.add_entry(
+            HistoryItem(
                 timestamp=datetime.datetime.now(),
                 instruction=ExecutionCore.TOOL_CALL,
                 input_state={},
                 output_state={},
-            ),
-        ]
+            )
+        )
 
         # Act
         result = checker.check_before(history)
@@ -193,14 +235,16 @@ class TestMetricThresholdPolicyRouter:
             threshold=0.6,
             target="generate",
         )
-        history = [
-            History(
+        history = History()
+        history.enter_next_superstep(["evaluate"])
+        history.add_entry(
+            HistoryItem(
                 timestamp=datetime.datetime.now(),
                 instruction=MetacognitiveCore.EVALUATE_PROGRESS,
                 input_state={},
                 output_state={"confidence": 0.4},
             )
-        ]
+        )
 
         # Act
         result = router.route_after(history)
@@ -217,14 +261,16 @@ class TestMetricThresholdPolicyRouter:
             threshold=0.6,
             target="generate",
         )
-        history = [
-            History(
+        history = History()
+        history.enter_next_superstep(["evaluate"])
+        history.add_entry(
+            HistoryItem(
                 timestamp=datetime.datetime.now(),
                 instruction=MetacognitiveCore.EVALUATE_PROGRESS,
                 input_state={},
                 output_state={"confidence": 0.8},
             )
-        ]
+        )
 
         # Act
         result = router.route_after(history)
@@ -238,14 +284,16 @@ class TestMetricThresholdPolicyRouter:
         router = MetricThresholdPolicyRouter(
             name="test", key="confidence", threshold=0.6, target="generate"
         )
-        history = [
-            History(
+        history = History()
+        history.enter_next_superstep(["evaluate"])
+        history.add_entry(
+            HistoryItem(
                 timestamp=datetime.datetime.now(),
                 instruction=MetacognitiveCore.EVALUATE_PROGRESS,
                 input_state={},
                 output_state={"confidence": 0.6},
             )
-        ]
+        )
 
         # Act
         result = router.route_after(history)
@@ -259,14 +307,16 @@ class TestMetricThresholdPolicyRouter:
         router = MetricThresholdPolicyRouter(
             name="test", key="confidence", threshold=0.6, target="generate"
         )
-        history = [
-            History(
+        history = History()
+        history.enter_next_superstep(["evaluate"])
+        history.add_entry(
+            HistoryItem(
                 timestamp=datetime.datetime.now(),
                 instruction=MetacognitiveCore.EVALUATE_PROGRESS,
                 input_state={},
                 output_state={},  # No confidence key
             )
-        ]
+        )
 
         # Act
         result = router.route_after(history)
@@ -280,14 +330,16 @@ class TestMetricThresholdPolicyRouter:
         router = MetricThresholdPolicyRouter(
             name="quality_check", key="quality_score", threshold=0.7, target="improve"
         )
-        history = [
-            History(
+        history = History()
+        history.enter_next_superstep(["monitor"])
+        history.add_entry(
+            HistoryItem(
                 timestamp=datetime.datetime.now(),
                 instruction=MetacognitiveCore.MONITOR_RESOURCES,
                 input_state={},
                 output_state={"quality_score": 0.5},
             )
-        ]
+        )
 
         # Act
         result = router.route_after(history)
@@ -301,20 +353,27 @@ class TestMetricThresholdPolicyRouter:
         router = MetricThresholdPolicyRouter(
             name="test", key="confidence", threshold=0.6, target="generate"
         )
-        history = [
-            History(
+        history = History()
+        # First superstep: GENERATE with low confidence
+        history.enter_next_superstep(["generate"])
+        history.add_entry(
+            HistoryItem(
                 timestamp=datetime.datetime.now(),
                 instruction=CognitiveCore.GENERATE,
                 input_state={},
                 output_state={"confidence": 0.3},  # Below threshold
-            ),
-            History(
+            )
+        )
+        # Second superstep: EVALUATE_PROGRESS with high confidence
+        history.enter_next_superstep(["evaluate"])
+        history.add_entry(
+            HistoryItem(
                 timestamp=datetime.datetime.now(),
                 instruction=MetacognitiveCore.EVALUATE_PROGRESS,
                 input_state={},
                 output_state={"confidence": 0.9},  # Above threshold
-            ),
-        ]
+            )
+        )
 
         # Act
         result = router.route_after(history)

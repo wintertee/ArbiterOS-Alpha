@@ -275,8 +275,7 @@ for chunk in graph.stream(initial_state, stream_mode="values", debug=False):
 ### Step 6: View History
 
 ```python
-from arbiteros_alpha import print_history
-print_history(os.history)
+os.history.pprint()
 ```
 
 Displays formatted execution history with all decisions and state changes.

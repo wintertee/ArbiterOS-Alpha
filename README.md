@@ -8,7 +8,7 @@ ArbiterOS-alpha is a lightweight governance framework that wraps LangGraph, enab
 
 ```bash
 # Run example
-uv run -m examples.main
+uv run -m examples.langgraph
 ```
 
 ## Features

@@ -138,8 +138,7 @@ app = graph.compile()
 result = app.invoke({"query": "user question"})
 
 # Optional: View execution history
-from arbiteros_alpha import print_history
-print_history(os.history)
+os.history.pprint()
 ```
 
 That's it! Your LangGraph code now has:

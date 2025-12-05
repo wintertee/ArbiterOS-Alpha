@@ -71,7 +71,6 @@ def evaluate(state: State) -> dict:
 
 ```python
 from langgraph.graph import StateGraph, END
-from arbiteros_alpha import print_history
 
 # Create graph
 graph = StateGraph(State)
@@ -90,7 +89,7 @@ app = graph.compile()
 result = app.invoke({"query": "What is AI?", "response": "", "confidence": 0.0})
 
 # Print execution history
-print_history(os.history)
+os.history.pprint()
 ```
 
 ## Understanding the Output

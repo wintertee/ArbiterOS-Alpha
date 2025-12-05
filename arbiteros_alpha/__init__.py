@@ -4,21 +4,21 @@ This package provides lightweight governance for LangGraph workflows through
 policy-based validation and dynamic routing.
 """
 
-from .core import ArbiterOSAlpha, History
+from .core import ArbiterOSAlpha
+from .history import History, HistoryItem
 from .policy import (
     HistoryPolicyChecker,
     MetricThresholdPolicyRouter,
     PolicyChecker,
     PolicyRouter,
 )
-from .utils import print_history
 
 __all__ = [
     "ArbiterOSAlpha",
     "History",
+    "HistoryItem",
     "PolicyChecker",
     "PolicyRouter",
     "HistoryPolicyChecker",
     "MetricThresholdPolicyRouter",
-    "print_history",
 ]

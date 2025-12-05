@@ -6,37 +6,25 @@ governance of LangGraph execution.
 
 import datetime
 import functools
+import inspect
 import logging
-from dataclasses import dataclass, field
+import weakref
 from typing import Any, Callable, Literal
 
+from langgraph.pregel import Pregel, _loop
 from langgraph.types import Command
 
+from .history import History, HistoryItem
 from .instructions import InstructionType
 from .policy import PolicyChecker, PolicyRouter
 
 logger = logging.getLogger(__name__)
 
+# Global registry to map Pregel (CompiledStateGraph) instances to their corresponding ArbiterOSAlpha instances
+_pregel_to_arbiter_map: weakref.WeakKeyDictionary = weakref.WeakKeyDictionary()
 
-@dataclass
-class History:
-    """The minimal OS metadata for tracking instruction execution.
-
-    Attributes:
-        timestamp: When the instruction was executed.
-        instruction: The instruction type that was executed.
-        input_state: The state passed to the instruction.
-        output_state: The state returned by the instruction.
-        check_policy_results: Results of policy checkers (name -> passed/failed).
-        route_policy_results: Results of policy routers (name -> target or None).
-    """
-
-    timestamp: datetime.datetime
-    instruction: InstructionType
-    input_state: dict[str, Any]
-    output_state: dict[str, Any] = field(default_factory=dict)
-    check_policy_results: dict[str, bool] = field(default_factory=dict)
-    route_policy_results: dict[str, str | None] = field(default_factory=dict)
+# Global registry to map PregelLoop instances to their parent Pregel instances
+_loop_to_pregel_map: weakref.WeakKeyDictionary = weakref.WeakKeyDictionary()
 
 
 class ArbiterOSAlpha:
@@ -69,9 +57,12 @@ class ArbiterOSAlpha:
                 - "vanilla": Use the framework-less ('from scratch') agent implementation.
         """
         self.backend = backend
-        self.history: list[History] = []
+        self.history: History = History()
         self.policy_checkers: list[PolicyChecker] = []
         self.policy_routers: list[PolicyRouter] = []
+
+        if self.backend == "langgraph":
+            self._patch_pregel_loop()
 
     def add_policy_checker(self, checker: PolicyChecker) -> None:
         """Register a policy checker for validation.
@@ -187,21 +178,24 @@ class ArbiterOSAlpha:
                     f"Executing instruction: {instruction_type.__class__.__name__}.{instruction_type.name}"
                 )
 
-                self.history.append(
-                    History(
-                        timestamp=datetime.datetime.now(),
-                        instruction=instruction_type,
-                        input_state=args[0],
-                    )
+                history_item = HistoryItem(
+                    timestamp=datetime.datetime.now(),
+                    instruction=instruction_type,
+                    input_state=args[0],
                 )
 
-                self.history[-1].check_policy_results, all_passed = self._check_before()
+                if self.backend == "vanilla":
+                    self.history.enter_next_superstep([instruction_type.name])
+
+                self.history.add_entry(history_item)
+
+                history_item.check_policy_results, all_passed = self._check_before()
 
                 result = func(*args, **kwargs)
                 logger.debug(f"Instruction {instruction_type.name} returned: {result}")
-                self.history[-1].output_state = result
+                history_item.output_state = result
 
-                self.history[-1].route_policy_results, destination = self._route_after()
+                history_item.route_policy_results, destination = self._route_after()
 
                 if destination:
                     return Command(update=result, goto=destination)
@@ -211,3 +205,108 @@ class ArbiterOSAlpha:
             return wrapper
 
         return decorator
+
+    def _patch_pregel_loop(self) -> None:
+        """Patch the Pregel loop to track planned nodes in history.
+
+        This method patches LangGraph's internal PregelLoop.__init__ and tick methods
+        to enable superstep tracking across multiple ArbiterOSAlpha instances.
+
+        Mechanism:
+            The patch uses a two-level mapping chain to associate PregelLoop instances
+            with their corresponding ArbiterOSAlpha instances:
+
+            1. PregelLoop -> Pregel mapping (_loop_to_pregel_map):
+               - Patched PregelLoop.__init__ inspects the call stack using inspect.stack()
+               - Finds the parent Pregel (CompiledStateGraph) instance that created the loop
+               - Stores this relationship in a WeakKeyDictionary for automatic cleanup
+
+            2. Pregel -> ArbiterOSAlpha mapping (_pregel_to_arbiter_map):
+               - Established via compile_graph() or register_compiled_graph()
+               - Maps each compiled graph to its governing OS instance
+               - Also uses WeakKeyDictionary to prevent memory leaks
+
+            3. History tracking via patched tick():
+               - Each tick, looks up: PregelLoop -> Pregel -> ArbiterOSAlpha
+               - Extracts planned nodes from loop_self.tasks
+               - Records them in the correct OS instance's history
+
+        Thread Safety:
+            Global patching happens only once per process (checked via _arbiteros_patched).
+            Multiple ArbiterOSAlpha instances share the same patched methods but maintain
+            separate histories through the mapping chain.
+
+        Notes:
+            - Uses WeakKeyDictionary to avoid preventing garbage collection
+            - PregelLoop instances are created fresh on each invoke()/stream() call
+            - Stack inspection adds minimal overhead (~1-2 frame traversals)
+        """
+        # Check if already patched globally to avoid duplicate patching
+        if hasattr(_loop.PregelLoop.__init__, "_arbiteros_patched"):
+            logger.debug("PregelLoop already patched globally")
+            return
+
+        # Patch __init__ to establish PregelLoop -> Pregel mapping
+        original_init = _loop.PregelLoop.__init__
+
+        def patched_init(loop_self: _loop.PregelLoop, *args, **kwargs):
+            # Call the original __init__
+            original_init(loop_self, *args, **kwargs)
+
+            # Find the parent Pregel instance from the call stack
+            for frame_info in inspect.stack()[1:]:
+                frame_locals = frame_info.frame.f_locals
+                if "self" in frame_locals:
+                    obj = frame_locals["self"]
+                    if isinstance(obj, Pregel):
+                        _loop_to_pregel_map[loop_self] = obj
+                        logger.debug(
+                            f"Mapped PregelLoop {id(loop_self)} to Pregel {id(obj)}"
+                        )
+                        break
+
+        # Patch tick to use the mapping for history tracking
+        original_tick = _loop.PregelLoop.tick
+
+        def patched_tick(loop_self: _loop.PregelLoop):
+            # Call the original method to perform the planning
+            result = original_tick(loop_self)
+
+            # === INJECTED CODE ===
+            # Look up the chain: PregelLoop -> Pregel -> ArbiterOSAlpha
+            pregel_instance = _loop_to_pregel_map.get(loop_self)
+            if pregel_instance is not None:
+                os_instance = _pregel_to_arbiter_map.get(pregel_instance)
+                if os_instance is not None:
+                    # This runs after planning is done for the step
+                    planned_nodes = [t.name for t in loop_self.tasks.values()]
+                    if planned_nodes:
+                        os_instance.history.enter_next_superstep(planned_nodes)
+                        logger.info(
+                            f"Planned nodes for OS {id(os_instance)}: {planned_nodes}"
+                        )
+            # =====================
+
+            return result
+
+        # Mark as patched to prevent duplicate patching
+        patched_init._arbiteros_patched = True
+        patched_tick._arbiteros_patched = True
+        _loop.PregelLoop.__init__ = patched_init
+        _loop.PregelLoop.tick = patched_tick
+        logger.debug("PregelLoop.__init__ and tick successfully patched globally")
+
+    def register_compiled_graph(self, pregel_loop: _loop.PregelLoop) -> None:
+        """Register a PregelLoop instance to be tracked by this ArbiterOSAlpha.
+
+        This method should be called after compiling a LangGraph to associate
+        the resulting PregelLoop with this OS instance for history tracking.
+
+        Args:
+            pregel_loop: The PregelLoop instance from compiled LangGraph.
+        """
+        _pregel_to_arbiter_map[pregel_loop] = self
+        logger.debug(
+            f"Registered PregelLoop {id(pregel_loop)} (type={type(pregel_loop).__name__}) to ArbiterOSAlpha {id(self)}"
+        )
+        logger.debug(f"Current map size: {len(_pregel_to_arbiter_map)}")
