@@ -46,9 +46,12 @@ class History:
         self.entries.append([])
 
     def add_entry(self, entry: HistoryItem) -> None:
-        if len(self.entries[-1]) == len(self.next_superstep):
+        if not self.entries or len(self.entries[-1]) >= len(self.next_superstep):
             raise RuntimeError(
-                "All nodes for the current superstep have already recorded entries."
+                "All nodes for the current superstep have already recorded entries.\n"
+                "Hint: Did you forget to call \n"
+                "    - register_compiled_graph() for langgraph backend or \n"
+                "    - enter_next_superstep() for vanilla backend?"
             )
         self.entries[-1].append(entry)
 
