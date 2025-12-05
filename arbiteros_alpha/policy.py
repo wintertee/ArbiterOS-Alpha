@@ -170,10 +170,9 @@ class MetricThresholdPolicyRouter(PolicyRouter):
             The target node name if metric value < threshold, None otherwise.
             When None is returned, execution continues with normal flow.
         """
-        try:
-            last_entry = history.entries[-1][-1]
-        except IndexError:
+        if not history.entries or not history.entries[-1]:
             return None
+        last_entry = history.entries[-1][-1]
         output = last_entry.output_state
         confidence = output.get(self.key, 1.0)
         if confidence < self.threshold:
