@@ -24,10 +24,15 @@ The main components are implemented in `arbiteros_alpha.core` and re-exported fr
     options:
       show_root_heading: true
       show_source: true
+      members:
+        - __init__
+        - enter_next_superstep
+        - add_entry
+        - pprint
 
-## Utilities
+## HistoryItem
 
-::: arbiteros_alpha.print_history
+::: arbiteros_alpha.HistoryItem
     options:
       show_root_heading: true
       show_source: true
