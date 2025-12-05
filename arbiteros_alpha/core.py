@@ -7,36 +7,16 @@ governance of LangGraph execution.
 import datetime
 import functools
 import logging
-from dataclasses import dataclass, field
 from typing import Any, Callable, Literal
 
+from langgraph.pregel import _loop
 from langgraph.types import Command
 
+from .history import History, HistoryItem
 from .instructions import InstructionType
 from .policy import PolicyChecker, PolicyRouter
 
 logger = logging.getLogger(__name__)
-
-
-@dataclass
-class History:
-    """The minimal OS metadata for tracking instruction execution.
-
-    Attributes:
-        timestamp: When the instruction was executed.
-        instruction: The instruction type that was executed.
-        input_state: The state passed to the instruction.
-        output_state: The state returned by the instruction.
-        check_policy_results: Results of policy checkers (name -> passed/failed).
-        route_policy_results: Results of policy routers (name -> target or None).
-    """
-
-    timestamp: datetime.datetime
-    instruction: InstructionType
-    input_state: dict[str, Any]
-    output_state: dict[str, Any] = field(default_factory=dict)
-    check_policy_results: dict[str, bool] = field(default_factory=dict)
-    route_policy_results: dict[str, str | None] = field(default_factory=dict)
 
 
 class ArbiterOSAlpha:
@@ -69,9 +49,11 @@ class ArbiterOSAlpha:
                 - "vanilla": Use the framework-less ('from scratch') agent implementation.
         """
         self.backend = backend
-        self.history: list[History] = []
+        self.history: History = History()
         self.policy_checkers: list[PolicyChecker] = []
         self.policy_routers: list[PolicyRouter] = []
+
+        self._patch_pregel_loop()
 
     def add_policy_checker(self, checker: PolicyChecker) -> None:
         """Register a policy checker for validation.
@@ -187,21 +169,24 @@ class ArbiterOSAlpha:
                     f"Executing instruction: {instruction_type.__class__.__name__}.{instruction_type.name}"
                 )
 
-                self.history.append(
-                    History(
-                        timestamp=datetime.datetime.now(),
-                        instruction=instruction_type,
-                        input_state=args[0],
-                    )
+                history_item = HistoryItem(
+                    timestamp=datetime.datetime.now(),
+                    instruction=instruction_type,
+                    input_state=args[0],
                 )
 
-                self.history[-1].check_policy_results, all_passed = self._check_before()
+                if self.backend == "vanilla":
+                    self.history.enter_next_superstep([instruction_type.name])
+
+                self.history.add_entry(history_item)
+
+                history_item.check_policy_results, all_passed = self._check_before()
 
                 result = func(*args, **kwargs)
                 logger.debug(f"Instruction {instruction_type.name} returned: {result}")
-                self.history[-1].output_state = result
+                history_item.output_state = result
 
-                self.history[-1].route_policy_results, destination = self._route_after()
+                history_item.route_policy_results, destination = self._route_after()
 
                 if destination:
                     return Command(update=result, goto=destination)
@@ -211,3 +196,39 @@ class ArbiterOSAlpha:
             return wrapper
 
         return decorator
+
+    def _patch_pregel_loop(self) -> None:
+        """Patch the Pregel loop to track planned nodes in history.
+
+        This method patches LangGraph's internal PregelLoop.tick method to
+        intercept node planning and record it in the execution history.
+        Uses a marker attribute to ensure patching happens only once.
+        """
+        # Check if already patched to avoid duplicate patching
+        if hasattr(_loop.PregelLoop.tick, "_arbiteros_patched"):
+            logger.debug("PregelLoop.tick already patched, skipping")
+            return
+
+        original_tick = _loop.PregelLoop.tick
+        os_instance = self
+
+        def patched_tick(pregel_self: _loop.PregelLoop):
+            # Call the original method to perform the planning
+            result = original_tick(pregel_self)
+
+            # === INJECTED CODE ===
+            # This runs after planning is done for the step
+            # We check if there are tasks, and if so, log them
+            # We filter out tasks that are just writing results (if any)
+            planned_nodes = [t.name for t in pregel_self.tasks.values()]
+            if planned_nodes:
+                os_instance.history.enter_next_superstep(planned_nodes)
+                logger.info(f"Planned nodes: {planned_nodes}")
+            # =====================
+
+            return result
+
+        # Mark as patched to prevent duplicate patching
+        patched_tick._arbiteros_patched = True
+        _loop.PregelLoop.tick = patched_tick
+        logger.debug("PregelLoop.tick successfully patched")
