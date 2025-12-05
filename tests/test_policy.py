@@ -21,7 +21,7 @@ from arbiteros_alpha.policy import HistoryPolicyChecker, MetricThresholdPolicyRo
 class TestHistoryPolicyChecker:
     """Test cases for HistoryPolicyChecker."""
 
-    def test_init_converts_sequence_to_string(self):
+    def test_init_stores_bad_sequence(self):
         """Test that bad_sequence is stored correctly."""
         # Arrange & Act
         checker = HistoryPolicyChecker(
