@@ -93,17 +93,13 @@ class HistoryPolicyChecker(PolicyChecker):
         )
         logger.debug(f"Bad sequence pattern: {[i.name for i in self.bad_sequence]}")
 
-        # 如果 pattern 比 workflow 还长，直接不可能
         if n_pat > n_work:
             return True
 
-        # 滑动窗口：遍历 workflow 中所有可能的起始位置
-        # 我们只需要检查 workflow[i] 到 workflow[i + n_pat] 这段区间
         for i in range(n_work - n_pat + 1):
             match = True
-            # 检查 pattern 的每一个节点是否在对应的 workflow 层级中
             for j in range(n_pat):
-                # i 是 workflow 的起始偏移量，j 是 pattern 的索引
+                # i for workflow offset，j for pattern index
                 current_stage_workers = history.entries[i + j]
                 current_stage_workers = [
                     item.instruction for item in current_stage_workers
@@ -118,7 +114,6 @@ class HistoryPolicyChecker(PolicyChecker):
                     match = False
                     break
 
-            # 如果在这个窗口 i 中，pattern 所有节点都匹配上了，则成功
             if match:
                 logger.debug(
                     f"Blacklisted sequence detected: {self.name}:[{self.bad_sequence}]"
