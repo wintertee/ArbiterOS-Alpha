@@ -1,12 +1,9 @@
 import logging
 from abc import ABC
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
 
+from .history import History
 from .instructions import InstructionType
-
-if TYPE_CHECKING:
-    from . import History
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +17,7 @@ class PolicyChecker(ABC):
     custom validation logic.
     """
 
-    def check_before(self, history: list["History"]) -> bool:
+    def check_before(self, history: History) -> bool:
         """Validate constraints before instruction execution.
 
         Args:
@@ -43,7 +40,7 @@ class PolicyRouter(ABC):
     the execution flow to a different node based on policy conditions.
     """
 
-    def route_after(self, history: list["History"]) -> str:
+    def route_after(self, history: History) -> str:
         """Determine the next node to execute based on policy conditions.
 
         Args:
@@ -74,11 +71,7 @@ class HistoryPolicyChecker(PolicyChecker):
     name: str
     bad_sequence: list[InstructionType]
 
-    def __post_init__(self):
-        """Convert sequence list to string representation after initialization."""
-        self._bad_sequence_str = "->".join(instr.name for instr in self.bad_sequence)
-
-    def check_before(self, history: list["History"]) -> bool:
+    def check_before(self, history: History) -> bool:
         """Check if the current history contains any blacklisted sequences.
 
         Args:
@@ -90,12 +83,47 @@ class HistoryPolicyChecker(PolicyChecker):
         Raises:
             RuntimeError: If a blacklisted sequence is detected in the history.
         """
-        history_sequence = "->".join(entry.instruction.name for entry in history)
-        if self._bad_sequence_str in history_sequence:
-            logger.debug(
-                f"Blacklisted sequence detected: {self.name}:[{self._bad_sequence_str}] in [{history_sequence}]"
-            )
-            return False
+
+        n_work = len(history.entries)
+
+        n_pat = len(self.bad_sequence)
+
+        logger.debug(
+            f"HistoryPolicyChecker '{self.name}': checking {n_work} completed supersteps against pattern of length {n_pat}"
+        )
+        logger.debug(f"Bad sequence pattern: {[i.name for i in self.bad_sequence]}")
+
+        # 如果 pattern 比 workflow 还长，直接不可能
+        if n_pat > n_work:
+            return True
+
+        # 滑动窗口：遍历 workflow 中所有可能的起始位置
+        # 我们只需要检查 workflow[i] 到 workflow[i + n_pat] 这段区间
+        for i in range(n_work - n_pat + 1):
+            match = True
+            # 检查 pattern 的每一个节点是否在对应的 workflow 层级中
+            for j in range(n_pat):
+                # i 是 workflow 的起始偏移量，j 是 pattern 的索引
+                current_stage_workers = history.entries[i + j]
+                current_stage_workers = [
+                    item.instruction for item in current_stage_workers
+                ]
+                target_worker = self.bad_sequence[j]
+
+                logger.debug(
+                    f"  Window[{i}][{j}]: checking if {target_worker.name} in {[w.name for w in current_stage_workers]}"
+                )
+
+                if target_worker not in current_stage_workers:
+                    match = False
+                    break
+
+            # 如果在这个窗口 i 中，pattern 所有节点都匹配上了，则成功
+            if match:
+                logger.debug(
+                    f"Blacklisted sequence detected: {self.name}:[{self.bad_sequence}]"
+                )
+                return False
 
         return True
 
@@ -132,7 +160,7 @@ class MetricThresholdPolicyRouter(PolicyRouter):
     threshold: float
     target: str
 
-    def route_after(self, history: list["History"]) -> str | None:
+    def route_after(self, history: History) -> str | None:
         """Route to target node if the monitored metric is below threshold.
 
         Extracts the specified metric from the most recent instruction's output
@@ -147,7 +175,10 @@ class MetricThresholdPolicyRouter(PolicyRouter):
             The target node name if metric value < threshold, None otherwise.
             When None is returned, execution continues with normal flow.
         """
-        last_entry = history[-1]
+        try:
+            last_entry = history.entries[-1][-1]
+        except IndexError:
+            return None
         output = last_entry.output_state
         confidence = output.get(self.key, 1.0)
         if confidence < self.threshold:
