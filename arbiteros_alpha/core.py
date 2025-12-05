@@ -61,7 +61,8 @@ class ArbiterOSAlpha:
         self.policy_checkers: list[PolicyChecker] = []
         self.policy_routers: list[PolicyRouter] = []
 
-        self._patch_pregel_loop()
+        if self.backend == "langgraph":
+            self._patch_pregel_loop()
 
     def add_policy_checker(self, checker: PolicyChecker) -> None:
         """Register a policy checker for validation.
