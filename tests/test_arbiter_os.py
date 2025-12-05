@@ -12,7 +12,7 @@ from typing import Any
 
 import pytest
 
-from arbiteros_alpha import ArbiterOSAlpha, History
+from arbiteros_alpha import ArbiterOSAlpha, HistoryItem
 from arbiteros_alpha.instructions import CognitiveCore, MetacognitiveCore
 from arbiteros_alpha.policy import (
     HistoryPolicyChecker,
@@ -29,7 +29,7 @@ class TestArbiterOSAlpha:
         os = ArbiterOSAlpha()
 
         # Assert
-        assert os.history == []
+        assert os.history.entries == []
         assert os.policy_checkers == []
         assert os.policy_routers == []
 
@@ -125,8 +125,9 @@ class TestArbiterOSAlpha:
             name="test", bad_sequence=[CognitiveCore.GENERATE, CognitiveCore.DECOMPOSE]
         )
         os.add_policy_checker(checker)
-        os.history.append(
-            History(
+        os.history.enter_next_superstep(["reflect"])
+        os.history.add_entry(
+            HistoryItem(
                 timestamp=datetime.datetime.now(),
                 instruction=CognitiveCore.REFLECT,
                 input_state={},
@@ -149,21 +150,25 @@ class TestArbiterOSAlpha:
             name="no_ab", bad_sequence=[CognitiveCore.GENERATE, CognitiveCore.DECOMPOSE]
         )
         os.add_policy_checker(checker)
-        os.history.extend(
-            [
-                History(
-                    timestamp=datetime.datetime.now(),
-                    instruction=CognitiveCore.GENERATE,
-                    input_state={},
-                    output_state={},
-                ),
-                History(
-                    timestamp=datetime.datetime.now(),
-                    instruction=CognitiveCore.DECOMPOSE,
-                    input_state={},
-                    output_state={},
-                ),
-            ]
+        # First superstep: generate
+        os.history.enter_next_superstep(["generate"])
+        os.history.add_entry(
+            HistoryItem(
+                timestamp=datetime.datetime.now(),
+                instruction=CognitiveCore.GENERATE,
+                input_state={},
+                output_state={},
+            )
+        )
+        # Second superstep: decompose
+        os.history.enter_next_superstep(["decompose"])
+        os.history.add_entry(
+            HistoryItem(
+                timestamp=datetime.datetime.now(),
+                instruction=CognitiveCore.DECOMPOSE,
+                input_state={},
+                output_state={},
+            )
         )
 
         # Act
@@ -194,8 +199,9 @@ class TestArbiterOSAlpha:
             name="test", key="confidence", threshold=0.5, target="retry"
         )
         os.add_policy_router(router)
-        os.history.append(
-            History(
+        os.history.enter_next_superstep(["evaluate"])
+        os.history.add_entry(
+            HistoryItem(
                 timestamp=datetime.datetime.now(),
                 instruction="evaluate",
                 input_state={},
@@ -218,8 +224,9 @@ class TestArbiterOSAlpha:
             name="regenerate", key="confidence", threshold=0.5, target="retry"
         )
         os.add_policy_router(router)
-        os.history.append(
-            History(
+        os.history.enter_next_superstep(["evaluate"])
+        os.history.add_entry(
+            HistoryItem(
                 timestamp=datetime.datetime.now(),
                 instruction="evaluate",
                 input_state={},
@@ -245,13 +252,15 @@ class TestArbiterOSAlpha:
             return {"result": "success"}
 
         # Act
+        os.history.enter_next_superstep(["test_func"])
         result = test_func({"input": "data"})
 
         # Assert
-        assert len(os.history) == 1
-        assert os.history[0].instruction == CognitiveCore.GENERATE
-        assert os.history[0].input_state == {"input": "data"}
-        assert os.history[0].output_state == {"result": "success"}
+        assert len(os.history.entries) == 1
+        assert len(os.history.entries[0]) == 1
+        assert os.history.entries[0][0].instruction == CognitiveCore.GENERATE
+        assert os.history.entries[0][0].input_state == {"input": "data"}
+        assert os.history.entries[0][0].output_state == {"result": "success"}
         assert result == {"result": "success"}
 
     def test_instruction_decorator_preserves_function_name(self):
@@ -284,12 +293,14 @@ class TestArbiterOSAlpha:
             return {"step": "b"}
 
         # Act
+        os.history.enter_next_superstep(["func_a"])
         func_a({})
+        os.history.enter_next_superstep(["func_b"])
         func_b({})
 
         # Assert
-        assert len(os.history) == 2
-        assert os.history[1].check_policy_results["no_ab"] is False
+        assert len(os.history.entries) == 2
+        assert os.history.entries[1][0].check_policy_results["no_ab"] is False
 
     def test_instruction_decorator_with_router_trigger(self):
         """Test instruction decorator with routing."""
@@ -305,6 +316,7 @@ class TestArbiterOSAlpha:
             return {"confidence": 0.3}
 
         # Act
+        os.history.enter_next_superstep(["evaluate"])
         result = evaluate({})
 
         # Assert
@@ -328,6 +340,7 @@ class TestArbiterOSAlpha:
             return {"confidence": 0.8}
 
         # Act
+        os.history.enter_next_superstep(["evaluate"])
         result = evaluate({})
 
         # Assert
@@ -346,13 +359,15 @@ class TestArbiterOSAlpha:
         before_time = datetime.datetime.now()
 
         # Act
+        os.history.enter_next_superstep(["test_func"])
         test_func({})
 
         after_time = datetime.datetime.now()
 
         # Assert
-        assert len(os.history) == 1
-        assert before_time <= os.history[0].timestamp <= after_time
+        assert len(os.history.entries) == 1
+        assert len(os.history.entries[0]) == 1
+        assert before_time <= os.history.entries[0][0].timestamp <= after_time
 
     def test_multiple_instructions_create_ordered_history(self):
         """Test that multiple instructions create ordered history entries."""
@@ -372,19 +387,22 @@ class TestArbiterOSAlpha:
             return {"step": 3}
 
         # Act
+        os.history.enter_next_superstep(["first"])
         first({})
+        os.history.enter_next_superstep(["second"])
         second({})
+        os.history.enter_next_superstep(["third"])
         third({})
 
         # Assert
-        assert len(os.history) == 3
-        assert os.history[0].instruction == CognitiveCore.GENERATE
-        assert os.history[1].instruction == CognitiveCore.DECOMPOSE
-        assert os.history[2].instruction == CognitiveCore.REFLECT
+        assert len(os.history.entries) == 3
+        assert os.history.entries[0][0].instruction == CognitiveCore.GENERATE
+        assert os.history.entries[1][0].instruction == CognitiveCore.DECOMPOSE
+        assert os.history.entries[2][0].instruction == CognitiveCore.REFLECT
         assert (
-            os.history[0].timestamp
-            <= os.history[1].timestamp
-            <= os.history[2].timestamp
+            os.history.entries[0][0].timestamp
+            <= os.history.entries[1][0].timestamp
+            <= os.history.entries[2][0].timestamp
         )
 
     def test_instruction_decorator_rejects_invalid_type(self):
@@ -421,13 +439,13 @@ class TestArbiterOSAlpha:
 
 
 class TestHistory:
-    """Test cases for History dataclass."""
+    """Test cases for HistoryItem dataclass."""
 
     def test_history_creation_with_required_fields(self):
-        """Test creating History with only required fields."""
+        """Test creating HistoryItem with only required fields."""
         # Arrange & Act
         timestamp = datetime.datetime.now()
-        history = History(
+        history = HistoryItem(
             timestamp=timestamp,
             instruction="test",
             input_state={"key": "value"},
@@ -442,10 +460,10 @@ class TestHistory:
         assert history.route_policy_results == {}
 
     def test_history_creation_with_all_fields(self):
-        """Test creating History with all fields."""
+        """Test creating HistoryItem with all fields."""
         # Arrange & Act
         timestamp = datetime.datetime.now()
-        history = History(
+        history = HistoryItem(
             timestamp=timestamp,
             instruction="test",
             input_state={"in": "data"},
