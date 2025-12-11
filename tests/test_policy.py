@@ -103,8 +103,8 @@ class TestHistoryPolicyChecker:
         # Assert
         assert result is False
 
-    def test_check_before_detects_sequence_in_middle(self):
-        """Test that blacklisted sequences are detected in the middle of history."""
+    def test_check_before_detects_sequence_ending_at_latest_superstep(self):
+        """Test that blacklisted sequences are detected when ending at the latest superstep."""
         # Arrange
         checker = HistoryPolicyChecker(
             name="test",
@@ -131,7 +131,7 @@ class TestHistoryPolicyChecker:
                 output_state={},
             )
         )
-        # Third superstep: TOOL_CALL (blacklisted!)
+        # Third superstep: TOOL_CALL (blacklisted! This ends the bad sequence)
         history.enter_next_superstep(["tool_call"])
         history.add_entry(
             HistoryItem(
@@ -141,7 +141,41 @@ class TestHistoryPolicyChecker:
                 output_state={},
             )
         )
-        # Fourth superstep: RESPOND
+
+        # Act - Check at the third superstep where violation completes
+        result = checker.check_before(history)
+
+        # Assert - Should detect the violation at superstep 3
+        assert result is False
+
+    def test_check_before_ignores_old_violations_not_ending_at_latest(self):
+        """Test that violations in history middle are ignored if they don't end at latest superstep."""
+        # Arrange
+        checker = HistoryPolicyChecker(
+            name="test",
+            bad_sequence=[CognitiveCore.GENERATE, ExecutionCore.TOOL_CALL],
+        )
+        history = History()
+        # Supersteps 1-2: GENERATE -> TOOL_CALL (would be violation, but in the past)
+        history.enter_next_superstep(["generate"])
+        history.add_entry(
+            HistoryItem(
+                timestamp=datetime.datetime.now(),
+                instruction=CognitiveCore.GENERATE,
+                input_state={},
+                output_state={},
+            )
+        )
+        history.enter_next_superstep(["tool_call"])
+        history.add_entry(
+            HistoryItem(
+                timestamp=datetime.datetime.now(),
+                instruction=ExecutionCore.TOOL_CALL,
+                input_state={},
+                output_state={},
+            )
+        )
+        # Superstep 3: RESPOND (latest - no violation ending here)
         history.enter_next_superstep(["respond"])
         history.add_entry(
             HistoryItem(
@@ -152,11 +186,11 @@ class TestHistoryPolicyChecker:
             )
         )
 
-        # Act
+        # Act - Check at the third superstep
         result = checker.check_before(history)
 
-        # Assert
-        assert result is False
+        # Assert - Should pass because violation doesn't end at latest superstep
+        assert result is True
 
     def test_check_before_with_empty_history(self):
         """Test check_before with empty history returns True."""

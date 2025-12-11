@@ -74,6 +74,9 @@ class HistoryPolicyChecker(PolicyChecker):
     def check_before(self, history: History) -> bool:
         """Check if the current history contains any blacklisted sequences.
 
+        Only checks windows that include the most recent superstep to avoid
+        redundant checks of already-validated history.
+
         Args:
             history: The execution history to validate.
 
@@ -85,7 +88,6 @@ class HistoryPolicyChecker(PolicyChecker):
         """
 
         n_work = len(history.entries)
-
         n_pat = len(self.bad_sequence)
 
         logger.debug(
@@ -96,10 +98,14 @@ class HistoryPolicyChecker(PolicyChecker):
         if n_pat > n_work:
             return True
 
-        for i in range(n_work - n_pat + 1):
+        # Only check windows that include the most recent superstep (n_work - 1)
+        # This avoids redundant checks of previously validated history
+        start_idx = max(0, n_work - n_pat)
+
+        for i in range(start_idx, n_work - n_pat + 1):
             match = True
             for j in range(n_pat):
-                # i for workflow offset，j for pattern index
+                # i for workflow offset, j for pattern index
                 current_stage_workers = history.entries[i + j]
                 current_stage_workers = [
                     item.instruction for item in current_stage_workers
