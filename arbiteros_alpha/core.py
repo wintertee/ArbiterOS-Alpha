@@ -296,17 +296,18 @@ class ArbiterOSAlpha:
         _loop.PregelLoop.tick = patched_tick
         logger.debug("PregelLoop.__init__ and tick successfully patched globally")
 
-    def register_compiled_graph(self, pregel_loop: _loop.PregelLoop) -> None:
-        """Register a PregelLoop instance to be tracked by this ArbiterOSAlpha.
+    def register_compiled_graph(self, compiled_graph: Pregel) -> None:
+        """Register a compiled LangGraph (Pregel) to be tracked by this ArbiterOSAlpha.
 
         This method should be called after compiling a LangGraph to associate
-        the resulting PregelLoop with this OS instance for history tracking.
+        the resulting Pregel instance (CompiledStateGraph) with this OS instance
+        for history tracking.
 
         Args:
-            pregel_loop: The PregelLoop instance from compiled LangGraph.
+            compiled_graph: The Pregel instance returned from StateGraph.compile().
         """
-        _pregel_to_arbiter_map[pregel_loop] = self
+        _pregel_to_arbiter_map[compiled_graph] = self
         logger.debug(
-            f"Registered PregelLoop {id(pregel_loop)} (type={type(pregel_loop).__name__}) to ArbiterOSAlpha {id(self)}"
+            f"Registered Pregel {id(compiled_graph)} (type={type(compiled_graph).__name__}) to ArbiterOSAlpha {id(self)}"
         )
         logger.debug(f"Current map size: {len(_pregel_to_arbiter_map)}")
