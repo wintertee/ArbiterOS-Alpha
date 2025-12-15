@@ -260,9 +260,7 @@ class ArbiterOSAlpha:
                     obj = frame_locals["self"]
                     if isinstance(obj, Pregel):
                         _loop_to_pregel_map[loop_self] = obj
-                        logger.debug(
-                            f"Mapped PregelLoop {id(loop_self)} to Pregel {id(obj)}"
-                        )
+                        logger.debug(f"Mapped PregelLoop {loop_self} to Pregel {obj}")
                         break
 
         # Patch tick to use the mapping for history tracking
@@ -283,7 +281,7 @@ class ArbiterOSAlpha:
                     if planned_nodes:
                         os_instance.history.enter_next_superstep(planned_nodes)
                         logger.info(
-                            f"Planned nodes for OS {id(os_instance)}: {planned_nodes}"
+                            f"Nodes in next superstep for OS {os_instance}: {planned_nodes}"
                         )
             # =====================
 
@@ -308,6 +306,6 @@ class ArbiterOSAlpha:
         """
         _pregel_to_arbiter_map[compiled_graph] = self
         logger.debug(
-            f"Registered Pregel {id(compiled_graph)} (type={type(compiled_graph).__name__}) to ArbiterOSAlpha {id(self)}"
+            f"Registered Pregel {compiled_graph} (type={type(compiled_graph).__name__}) to ArbiterOSAlpha {self}"
         )
         logger.debug(f"Current map size: {len(_pregel_to_arbiter_map)}")
