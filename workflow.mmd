@@ -9,10 +9,10 @@ graph TD
     reason["reason<br/>(Generate)"]
     report["report<br/>(Generate)"]
     resolve_blockers["resolve_blockers<br/>(Fallback)"]
-    plan --> orchestrate
-    reason --> decide_finish
-    resolve_blockers --> reason
     execute --> orchestrate
+    resolve_blockers --> reason
+    reason --> decide_finish
+    plan --> orchestrate
     report --> End
     Start --> plan
     orchestrate --> perceive
