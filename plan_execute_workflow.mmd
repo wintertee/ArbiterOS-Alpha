@@ -1,0 +1,11 @@
+graph TD
+    Start[Start]:::startNode
+    agent["agent<br/>(Tool Call)"]
+    planner["planner<br/>(Generate)"]
+    replan["replan<br/>(Generate)"]
+    Start --> planner
+    planner --> agent
+    agent --> replan
+    replan --> agent
+    classDef startNode fill:#90EE90,stroke:#333,stroke-width:2px
+    classDef endNode fill:#FFB6C1,stroke:#333,stroke-width:2px

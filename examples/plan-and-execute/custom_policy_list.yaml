@@ -1,0 +1,59 @@
+# Plan-and-Execute Agent Policy List
+#
+# These policies are specific to the plan-and-execute agent example. They ensure
+# the graph properly handles plan execution, replanning, and response generation
+# with quality control, error handling, and resource management.
+#
+# Policy Categories:
+# 1. Quality Control: Ensure plans and responses meet quality thresholds
+# 2. Error Handling: Prevent infinite loops and handle execution failures
+# 3. Resource Management: Limit step counts and token usage
+# 4. Safety: Prevent unsafe execution patterns
+#
+# Kernel-level policies remain unchanged.
+
+policy_routers:
+  # Quality Control Policies
+  
+  # Route back to planner if plan quality is too low
+  # This ensures we don't execute poor quality plans
+  - type: MetricThresholdPolicyRouter
+    name: replan_on_low_plan_quality_yaml
+    key: plan_quality_score
+    threshold: 0.5
+    target: planner
+  
+  # Route back to planner if execution success rate drops too low
+  # This helps recover from execution failures
+  - type: MetricThresholdPolicyRouter
+    name: replan_on_low_execution_success_yaml
+    key: execution_success_score
+    threshold: 0.5
+    target: planner
+  
+  # Resource Management Policies
+  
+  # Route back to planner if too many steps have been executed
+  # This prevents infinite loops and excessive token usage
+  - type: MetricThresholdPolicyRouter
+    name: replan_on_high_step_count_yaml
+    key: step_count
+    threshold: 10.0
+    target: planner
+  
+  # Continue execution if response quality is low (don't end prematurely)
+  # This ensures we try to improve the response before ending
+  - type: MetricThresholdPolicyRouter
+    name: continue_on_low_response_quality
+    key: response_quality_score
+    threshold: 0.6
+    target: agent
+
+# Note: Policy checkers are defined in custom_policy.py because they require
+# custom logic beyond simple threshold checking. The checkers include:
+# - PlanQualityPolicyChecker: Validates plan quality before execution
+# - StepCountPolicyChecker: Limits total execution steps
+# - ErrorCountPolicyChecker: Limits consecutive errors
+#
+# Graph structure checkers are also defined in custom_policy.py to prevent
+# unsafe execution patterns like infinite loops.
