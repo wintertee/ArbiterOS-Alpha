@@ -246,8 +246,16 @@ class ArbiterOSAlpha:
             A final boolean indicating if all checkers passed.
         """
         results = {}
-        logger.debug(f"Running {len(self.policy_checkers)} policy checkers (before)")
+        current_node_name = self.history[-1].node_name if self.history else None
+        logger.debug(f"Running {len(self.policy_checkers)} policy checkers (before) for node: {current_node_name}")
+        
         for checker in self.policy_checkers:
+            # Check if this checker should be applied to the current node
+            if current_node_name and hasattr(checker, 'should_apply'):
+                if not checker.should_apply(current_node_name):
+                    logger.debug(f"Skipping checker {checker.name} for node {current_node_name}")
+                    continue
+            
             result = checker.check_before(self.history)
 
             if result is False:
@@ -269,8 +277,34 @@ class ArbiterOSAlpha:
         results = {}
         destination = None
         used_router = None
-        logger.debug(f"Checking {len(self.policy_routers)} policy routers")
+        current_node_name = self.history[-1].node_name if self.history else None
+        logger.debug(f"Checking {len(self.policy_routers)} policy routers for node: {current_node_name}")
+        
+        # Collect metrics from all routers to merge into output_state
+        collected_metrics = {}
+        
         for router in self.policy_routers:
+            # Check if this router should be applied to the current node
+            if current_node_name and hasattr(router, 'should_apply'):
+                if not router.should_apply(current_node_name):
+                    logger.debug(
+                        f"Skipping router {router.name} for node {current_node_name} "
+                        f"(target_nodes: {getattr(router, 'target_nodes', None)})"
+                    )
+                    continue
+                else:
+                    logger.debug(
+                        f"Applying router {router.name} to node {current_node_name} "
+                        f"(target_nodes: {getattr(router, 'target_nodes', None)})"
+                    )
+            
+            # Get metrics from router if available
+            if hasattr(router, 'get_metrics'):
+                metrics = router.get_metrics(self.history)
+                if metrics:
+                    collected_metrics.update(metrics)
+                    logger.debug(f"Router {router.name} provided metrics: {list(metrics.keys())}")
+            
             decision = router.route_after(self.history)
 
             if decision:
@@ -286,6 +320,11 @@ class ArbiterOSAlpha:
 
         if destination is not None:
             logger.warning(f"Router {used_router} decision made to: {destination}")
+        
+        # Store collected metrics in history for later merging
+        if collected_metrics:
+            self.history[-1]._policy_metrics = collected_metrics
+        
         return results, destination
     
     def _extract_node_to_instruction(
@@ -775,6 +814,17 @@ class ArbiterOSAlpha:
                     self.history[-1].output_state = result if isinstance(result, dict) else {"raw": result}
 
                 self.history[-1].route_policy_results, destination = self._route_after()
+                
+                # Merge policy metrics into output_state and result if available
+                if hasattr(self.history[-1], '_policy_metrics') and self.history[-1]._policy_metrics:
+                    metrics = self.history[-1]._policy_metrics
+                    if isinstance(self.history[-1].output_state, dict):
+                        self.history[-1].output_state.update(metrics)
+                    # Also update result if it's a dict
+                    if isinstance(result, dict):
+                        result = {**result, **metrics}
+                    elif isinstance(result, Command) and hasattr(result, "update") and isinstance(result.update, dict):
+                        result.update = {**result.update, **metrics}
 
                 if destination:
                     return Command(update=result, goto=destination)

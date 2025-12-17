@@ -70,7 +70,8 @@ class PlanQualityAlertChecker(AlertOnlyPolicyChecker):
         self, 
         name: str = "alert_plan_quality", 
         threshold: float = 0.4,
-        alert_level: str = "warning"
+        alert_level: str = "warning",
+        target_nodes: list[str] | None = None
     ):
         """Initialize plan quality alert checker.
         
@@ -78,9 +79,13 @@ class PlanQualityAlertChecker(AlertOnlyPolicyChecker):
             name: Name of the policy checker.
             threshold: Threshold below which to alert (0.0-1.0).
             alert_level: Logging level for alerts.
+            target_nodes: List of node names where this checker should apply.
+                Defaults to ["planner", "replan"] since only these nodes output plans.
         """
         super().__init__(name, alert_level)
         self.threshold = threshold
+        # Note: target_nodes should use function names, not graph node names
+        self.target_nodes = target_nodes if target_nodes is not None else ["plan_step", "replan_step"]
 
     def check_before(self, history: list) -> bool:
         """Check plan quality and alert if below threshold.
@@ -142,7 +147,8 @@ class StepCountAlertChecker(AlertOnlyPolicyChecker):
         self, 
         name: str = "alert_step_count", 
         max_steps: int = 15,
-        alert_level: str = "warning"
+        alert_level: str = "warning",
+        target_nodes: list[str] | None = None
     ):
         """Initialize step count alert checker.
         
@@ -150,9 +156,13 @@ class StepCountAlertChecker(AlertOnlyPolicyChecker):
             name: Name of the policy checker.
             max_steps: Threshold above which to alert.
             alert_level: Logging level for alerts.
+            target_nodes: List of node names where this checker should apply.
+                Defaults to ["agent"] since only this node executes steps.
         """
         super().__init__(name, alert_level)
         self.max_steps = max_steps
+        # Note: target_nodes should use function names, not graph node names
+        self.target_nodes = target_nodes if target_nodes is not None else ["execute_step"]
 
     def check_before(self, history: list) -> bool:
         """Check step count and alert if above threshold.
@@ -198,7 +208,8 @@ class ErrorCountAlertChecker(AlertOnlyPolicyChecker):
         self, 
         name: str = "alert_error_count", 
         max_errors: int = 3,
-        alert_level: str = "warning"
+        alert_level: str = "warning",
+        target_nodes: list[str] | None = None
     ):
         """Initialize error count alert checker.
         
@@ -206,9 +217,13 @@ class ErrorCountAlertChecker(AlertOnlyPolicyChecker):
             name: Name of the policy checker.
             max_errors: Threshold above which to alert.
             alert_level: Logging level for alerts.
+            target_nodes: List of node names where this checker should apply.
+                Defaults to ["agent"] since only this node can encounter errors.
         """
         super().__init__(name, alert_level)
         self.max_errors = max_errors
+        # Note: target_nodes should use function names, not graph node names
+        self.target_nodes = target_nodes if target_nodes is not None else ["execute_step"]
 
     def check_before(self, history: list) -> bool:
         """Check error count and alert if above threshold.
@@ -265,7 +280,8 @@ class PlanQualityPolicyRouter(PolicyRouter):
         self,
         name: str = "replan_on_low_plan_quality",
         threshold: float = 0.5,
-        target: str = "planner"
+        target: str = "planner",
+        target_nodes: list[str] | None = None
     ):
         """Initialize plan quality router.
         
@@ -273,10 +289,16 @@ class PlanQualityPolicyRouter(PolicyRouter):
             name: Name of the router.
             threshold: Minimum plan quality required (0.0-1.0).
             target: Target node to route to when quality is below threshold.
+            target_nodes: List of node names where this router should apply.
+                Defaults to ["planner", "replan"] since only these nodes output plans.
         """
         self.name = name
         self.threshold = threshold
         self.target = target
+        # Note: target_nodes should use function names, not graph node names
+        # Function names: plan_step, execute_step, replan_step
+        # Graph node names: planner, agent, replan
+        self.target_nodes = target_nodes if target_nodes is not None else ["plan_step", "replan_step"]
 
     def route_after(self, history: list) -> str | None:
         """Route to target node if plan quality is below threshold.
@@ -290,22 +312,44 @@ class PlanQualityPolicyRouter(PolicyRouter):
         Returns:
             Target node name if quality < threshold, None otherwise.
         """
-        if not history or len(history) < 2:
+        if not history:
             return None
         
         last_entry = history[-1]
+        current_node_name = last_entry.node_name
         output_state = last_entry.output_state
+        
+        # Debug: Print current node and output state keys
+        print(f"[DEBUG PlanQualityPolicyRouter] Current node: {current_node_name}, "
+              f"Output state keys: {list(output_state.keys())}, "
+              f"Target nodes: {self.target_nodes}, History length: {len(history)}")
+        
+        # Early return if output state doesn't contain "plan" key
+        # This happens when replan_step returns "response" instead of "plan"
+        if "plan" not in output_state:
+            print(f"[DEBUG PlanQualityPolicyRouter] No 'plan' key in output_state, skipping")
+            return None
         
         # Prevent infinite loops: don't route if we just came from the target
         # Check if the previous node was the target (to avoid planner -> replan -> planner loops)
-        prev_entry = history[-2]
-        prev_node = prev_entry.node_name
-        if prev_node == self.target:
-            # Just came from target, don't route back immediately
-            return None
+        # Only check if we have at least 2 entries in history
+        if len(history) >= 2:
+            prev_entry = history[-2]
+            prev_node = prev_entry.node_name
+            if prev_node == self.target:
+                # Just came from target, don't route back immediately
+                print(f"[DEBUG PlanQualityPolicyRouter] Just came from target {self.target}, skipping to prevent loop")
+                return None
         
         # Calculate plan quality independently
+        # If output_state doesn't have "plan" key, it means replan_step returned "response" instead
+        # In this case, we should not check plan quality (workflow is ending)
+        if "plan" not in output_state:
+            print(f"[DEBUG PlanQualityPolicyRouter] No 'plan' key in output_state (likely returned 'response'), skipping quality check")
+            return None
+        
         plan = output_state.get("plan", [])
+        print(f"[DEBUG PlanQualityPolicyRouter] Plan: {plan}, Node: {current_node_name}")
         if not plan:
             plan_quality = 0.0
         else:
@@ -332,6 +376,66 @@ class PlanQualityPolicyRouter(PolicyRouter):
         
         return None
 
+    def get_metrics(self, history: list) -> dict[str, float] | None:
+        """Calculate and return plan quality metrics to be merged into output state.
+        
+        This method is called by the framework to collect metrics that will be
+        automatically merged into the output state, allowing state tracking
+        without modifying node functions.
+        
+        Args:
+            history: Execution history including the just-executed instruction.
+            
+        Returns:
+            Dictionary with plan_quality_score (if plan found) or response_quality_score
+            (if response found), or None if neither found.
+        """
+        if not history:
+            return None
+        
+        last_entry = history[-1]
+        output_state = last_entry.output_state
+        metrics = {}
+        
+        # Calculate plan quality if plan exists
+        if "plan" in output_state:
+            plan = output_state.get("plan", [])
+            if not plan:
+                plan_quality = 0.0
+            else:
+                step_count = len(plan)
+                if step_count == 0:
+                    plan_quality = 0.0
+                elif step_count > 10:
+                    plan_quality = 0.3
+                elif step_count < 2:
+                    plan_quality = 0.5
+                else:
+                    plan_quality = min(1.0, 0.7 + 0.1 * (7 - abs(step_count - 5)))
+                
+                avg_step_length = sum(len(step) for step in plan) / max(len(plan), 1)
+                clarity_bonus = min(0.2, avg_step_length / 100.0)
+                plan_quality = min(1.0, plan_quality + clarity_bonus)
+            
+            metrics["plan_quality_score"] = plan_quality
+        
+        # Calculate response quality if response exists
+        if "response" in output_state:
+            response = output_state.get("response", "")
+            if response:
+                # Simple quality heuristic: longer responses with key information are better
+                response_length = len(response)
+                has_answer_indicators = any(
+                    word in response.lower()
+                    for word in ["is", "are", "was", "were", "the", "answer", "result"]
+                )
+                response_quality = min(1.0, 0.5 + 0.3 * (response_length > 50) + 0.2 * has_answer_indicators)
+                metrics["response_quality_score"] = response_quality
+            else:
+                metrics["response_quality_score"] = 0.0
+        
+        return metrics if metrics else None
+
 
 class StepCountPolicyRouter(PolicyRouter):
     """Policy router that routes based on calculated step count.
@@ -344,7 +448,8 @@ class StepCountPolicyRouter(PolicyRouter):
         self,
         name: str = "replan_on_high_step_count",
         threshold: float = 10.0,
-        target: str = "planner"
+        target: str = "planner",
+        target_nodes: list[str] | None = None
     ):
         """Initialize step count router.
         
@@ -352,10 +457,15 @@ class StepCountPolicyRouter(PolicyRouter):
             name: Name of the router.
             threshold: Maximum step count before routing.
             target: Target node to route to when step count exceeds threshold.
+            target_nodes: List of node names where this router should apply.
+                Defaults to ["execute_step"] since only this node executes steps.
+                Note: Use function names, not graph node names.
         """
         self.name = name
         self.threshold = threshold
         self.target = target
+        # Note: target_nodes should use function names, not graph node names
+        self.target_nodes = target_nodes if target_nodes is not None else ["execute_step"]
 
     def route_after(self, history: list) -> str | None:
         """Route to target node if step count exceeds threshold.
@@ -369,15 +479,17 @@ class StepCountPolicyRouter(PolicyRouter):
         Returns:
             Target node name if step_count >= threshold, None otherwise.
         """
-        if not history or len(history) < 2:
+        if not history:
             return None
         
         # Prevent infinite loops: don't route if we just came from the target
-        prev_entry = history[-2]
-        prev_node = prev_entry.node_name
-        if prev_node == self.target:
-            # Just came from target, don't route back immediately
-            return None
+        # Only check if we have at least 2 entries in history
+        if len(history) >= 2:
+            prev_entry = history[-2]
+            prev_node = prev_entry.node_name
+            if prev_node == self.target:
+                # Just came from target, don't route back immediately
+                return None
         
         last_entry = history[-1]
         output_state = last_entry.output_state
@@ -395,6 +507,27 @@ class StepCountPolicyRouter(PolicyRouter):
         
         return None
 
+    def get_metrics(self, history: list) -> dict[str, int] | None:
+        """Calculate and return step count metrics to be merged into output state.
+        
+        Args:
+            history: Execution history including the just-executed instruction.
+            
+        Returns:
+            Dictionary with step_count, or None if not applicable.
+        """
+        if not history:
+            return None
+        
+        last_entry = history[-1]
+        output_state = last_entry.output_state
+        
+        # Calculate step count from past_steps
+        past_steps = output_state.get("past_steps", [])
+        step_count = len(past_steps)
+        
+        return {"step_count": step_count}
+
 
 class ExecutionSuccessPolicyRouter(PolicyRouter):
     """Policy router that routes based on calculated execution success rate.
@@ -407,7 +540,8 @@ class ExecutionSuccessPolicyRouter(PolicyRouter):
         self,
         name: str = "replan_on_low_execution_success",
         threshold: float = 0.5,
-        target: str = "planner"
+        target: str = "planner",
+        target_nodes: list[str] | None = None
     ):
         """Initialize execution success router.
         
@@ -415,10 +549,15 @@ class ExecutionSuccessPolicyRouter(PolicyRouter):
             name: Name of the router.
             threshold: Minimum execution success rate required (0.0-1.0).
             target: Target node to route to when success rate is below threshold.
+            target_nodes: List of node names where this router should apply.
+                Defaults to ["execute_step"] since only this node executes steps.
+                Note: Use function names, not graph node names.
         """
         self.name = name
         self.threshold = threshold
         self.target = target
+        # Note: target_nodes should use function names, not graph node names
+        self.target_nodes = target_nodes if target_nodes is not None else ["execute_step"]
 
     def route_after(self, history: list) -> str | None:
         """Route to target node if execution success rate is below threshold.
@@ -432,15 +571,17 @@ class ExecutionSuccessPolicyRouter(PolicyRouter):
         Returns:
             Target node name if success_rate < threshold, None otherwise.
         """
-        if not history or len(history) < 2:
+        if not history:
             return None
         
         # Prevent infinite loops: don't route if we just came from the target
-        prev_entry = history[-2]
-        prev_node = prev_entry.node_name
-        if prev_node == self.target:
-            # Just came from target, don't route back immediately
-            return None
+        # Only check if we have at least 2 entries in history
+        if len(history) >= 2:
+            prev_entry = history[-2]
+            prev_node = prev_entry.node_name
+            if prev_node == self.target:
+                # Just came from target, don't route back immediately
+                return None
         
         last_entry = history[-1]
         output_state = last_entry.output_state
@@ -475,6 +616,48 @@ class ExecutionSuccessPolicyRouter(PolicyRouter):
             return self.target
         
         return None
+
+    def get_metrics(self, history: list) -> dict[str, float] | None:
+        """Calculate and return execution success metrics to be merged into output state.
+        
+        Args:
+            history: Execution history including the just-executed instruction.
+            
+        Returns:
+            Dictionary with execution_success_score and error_count, or None if not applicable.
+        """
+        if not history:
+            return None
+        
+        last_entry = history[-1]
+        output_state = last_entry.output_state
+        
+        # Calculate execution success rate independently
+        past_steps = output_state.get("past_steps", [])
+        if not past_steps:
+            return None
+        
+        error_indicators = [
+            "error",
+            "failed",
+            "unable to",
+            "cannot",
+            "connection issue",
+            "not available",
+        ]
+        error_count = sum(
+            1 for _, result in past_steps
+            if any(indicator.lower() in str(result).lower() for indicator in error_indicators)
+        )
+        
+        total_steps = len(past_steps)
+        success_steps = total_steps - error_count
+        execution_success_score = success_steps / max(total_steps, 1)
+        
+        return {
+            "execution_success_score": execution_success_score,
+            "error_count": error_count,
+        }
 
 
 def get_policies() -> Dict[str, List[PolicyType]]:
@@ -519,21 +702,24 @@ def get_policies() -> Dict[str, List[PolicyType]]:
             # These routers can redirect flow but may interfere with normal execution.
             # Uncomment to enable routing-based governance (use with caution).
             # 
-            # PlanQualityPolicyRouter(
-            #     name="replan_on_low_plan_quality",
-            #     threshold=0.5,
-            #     target="planner",
-            # ),
-            # ExecutionSuccessPolicyRouter(
-            #     name="replan_on_low_execution_success",
-            #     threshold=0.5,
-            #     target="planner",
-            # ),
-            # StepCountPolicyRouter(
-            #     name="replan_on_high_step_count",
-            #     threshold=10.0,
-            #     target="planner",
-            # ),
+            PlanQualityPolicyRouter(
+                name="replan_on_low_plan_quality",
+                threshold=0.5,
+                target="planner",
+                target_nodes=["plan_step", "replan_step"],  # Use function names, not graph node names
+            ),
+            ExecutionSuccessPolicyRouter(
+                name="replan_on_low_execution_success",
+                threshold=0.5,
+                target="planner",
+                target_nodes=["execute_step"],  # Use function names, not graph node names
+            ),
+            StepCountPolicyRouter(
+                name="replan_on_high_step_count",
+                threshold=10.0,
+                target="replan",
+                target_nodes=["execute_step"],  # Use function names, not graph node names
+            ),
         ],
         "graph_structure_checkers": [
             # Graph structure checkers: Validate workflow structure (alert-only)

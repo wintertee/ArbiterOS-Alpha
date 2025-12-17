@@ -1,7 +1,7 @@
 import logging
 from abc import ABC
-from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Any
 
 from .instructions import InstructionType
 
@@ -19,6 +19,24 @@ class PolicyChecker(ABC):
     Subclasses must implement check_before method to define
     custom validation logic.
     """
+
+    def __post_init__(self):
+        """Initialize target_nodes if not set."""
+        if not hasattr(self, 'target_nodes'):
+            self.target_nodes = None
+
+    def should_apply(self, current_node_name: str) -> bool:
+        """Check if this checker should be applied to the current node.
+        
+        Args:
+            current_node_name: Name of the current node being executed.
+            
+        Returns:
+            True if this checker should be applied, False otherwise.
+        """
+        if self.target_nodes is None:
+            return True  # Apply to all nodes
+        return current_node_name in self.target_nodes
 
     def check_before(self, history: list["History"]) -> bool:
         """Validate constraints before instruction execution.
@@ -43,6 +61,24 @@ class PolicyRouter(ABC):
     the execution flow to a different node based on policy conditions.
     """
 
+    def __post_init__(self):
+        """Initialize target_nodes if not set."""
+        if not hasattr(self, 'target_nodes'):
+            self.target_nodes = None
+
+    def should_apply(self, current_node_name: str) -> bool:
+        """Check if this router should be applied to the current node.
+        
+        Args:
+            current_node_name: Name of the current node being executed.
+            
+        Returns:
+            True if this router should be applied, False otherwise.
+        """
+        if self.target_nodes is None:
+            return True  # Apply to all nodes
+        return current_node_name in self.target_nodes
+
     def route_after(self, history: list["History"]) -> str:
         """Determine the next node to execute based on policy conditions.
 
@@ -53,6 +89,22 @@ class PolicyRouter(ABC):
             The name of the target node to route to, or None to continue normal flow.
         """
         pass
+
+    def get_metrics(self, history: list["History"]) -> dict[str, Any] | None:
+        """Calculate and return metrics to be merged into output state.
+        
+        This is an optional method that allows routers to calculate metrics
+        and have them automatically merged into the output state. This is useful
+        for tracking quality scores, success rates, etc. without modifying
+        the original node functions.
+        
+        Args:
+            history: The execution history including the just-executed instruction.
+            
+        Returns:
+            A dictionary of metrics to merge into output_state, or None if no metrics.
+        """
+        return None
 
 
 @dataclass
@@ -73,6 +125,7 @@ class HistoryPolicyChecker(PolicyChecker):
 
     name: str
     bad_sequence: list[InstructionType]
+    target_nodes: list[str] | None = field(default=None)
 
     def __post_init__(self):
         """Convert sequence list to string representation after initialization."""
@@ -131,6 +184,7 @@ class MetricThresholdPolicyRouter(PolicyRouter):
     key: str
     threshold: float
     target: str
+    target_nodes: list[str] | None = field(default=None)
 
     def route_after(self, history: list["History"]) -> str | None:
         """Route to target node if the monitored metric is below threshold.
