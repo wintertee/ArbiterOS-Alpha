@@ -285,14 +285,16 @@ class ArbiterOSDashboard:
         rows = []
         for row in table_data:
             is_fork = "Fork" if row.get("is_fork") else "Execute"
-            rows.append([
-                row["time"],
-                row["node"],
-                row["checkpoint_id_short"],
-                row["checkpoint_id"],  # Hidden full ID for selection
-                row.get("next_nodes", "(end)"),
-                is_fork,
-            ])
+            rows.append(
+                [
+                    row["time"],
+                    row["node"],
+                    row["checkpoint_id_short"],
+                    row["checkpoint_id"],  # Hidden full ID for selection
+                    row.get("next_nodes", "(end)"),
+                    is_fork,
+                ]
+            )
         return rows
 
     def get_state_before(self, checkpoint_id: str) -> str:
@@ -343,7 +345,9 @@ class ArbiterOSDashboard:
         if self.arbiter_os.checkpoint_manager is None:
             return "Checkpoints not enabled"
 
-        snapshot = self.arbiter_os.checkpoint_manager.get_checkpoint_by_id(checkpoint_id)
+        snapshot = self.arbiter_os.checkpoint_manager.get_checkpoint_by_id(
+            checkpoint_id
+        )
         if snapshot is None:
             return "Checkpoint not found"
 
@@ -371,7 +375,12 @@ class ArbiterOSDashboard:
             Tuple of (state_before, state_after, details, selected_id).
         """
         if evt.index is None or not table_data:
-            return "Select a checkpoint", "Select a checkpoint", "Select a checkpoint", ""
+            return (
+                "Select a checkpoint",
+                "Select a checkpoint",
+                "Select a checkpoint",
+                "",
+            )
 
         row_idx = evt.index[0] if isinstance(evt.index, (list, tuple)) else evt.index
         if row_idx >= len(table_data):
@@ -555,7 +564,9 @@ class ArbiterOSDashboard:
 
             with gr.Row():
                 with gr.Column():
-                    gr.Markdown("**Update State**: Modify state values at the selected checkpoint")
+                    gr.Markdown(
+                        "**Update State**: Modify state values at the selected checkpoint"
+                    )
                     new_state_input = gr.Textbox(
                         label="New State (JSON)",
                         placeholder='{"key": "new_value"}',
@@ -695,4 +706,3 @@ def launch_dashboard(
     """
     dashboard = create_dashboard(arbiter_os)
     dashboard.launch(share=share, server_name=server_name, server_port=server_port)
-

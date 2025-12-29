@@ -7,7 +7,6 @@ This module provides tools to parse Python source files and identify:
 """
 
 import ast
-import textwrap
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal
@@ -156,7 +155,9 @@ class AgentParser:
         # Find compile assignment (graph = builder.compile())
         for node in ast.walk(tree):
             if isinstance(node, ast.Assign):
-                if isinstance(node.value, ast.Call) and self._is_compile_call(node.value):
+                if isinstance(node.value, ast.Call) and self._is_compile_call(
+                    node.value
+                ):
                     if node.targets and isinstance(node.targets[0], ast.Name):
                         graph_variable = node.targets[0].id
                         compile_lineno = node.lineno
@@ -164,7 +165,9 @@ class AgentParser:
         # Find where imports end
         for node in ast.iter_child_nodes(tree):
             if isinstance(node, (ast.Import, ast.ImportFrom)):
-                imports_end_lineno = max(imports_end_lineno, node.end_lineno or node.lineno)
+                imports_end_lineno = max(
+                    imports_end_lineno, node.end_lineno or node.lineno
+                )
 
         # Second pass: extract all function definitions
         functions: list[ParsedFunction] = []
@@ -243,7 +246,9 @@ class AgentParser:
                         return True
         return False
 
-    def _extract_function(self, node: ast.FunctionDef, source_code: str) -> ParsedFunction:
+    def _extract_function(
+        self, node: ast.FunctionDef, source_code: str
+    ) -> ParsedFunction:
         """Extract function information from an AST FunctionDef node."""
         # Get docstring
         docstring = ast.get_docstring(node)
@@ -269,4 +274,3 @@ class AgentParser:
             end_lineno=end_line,
             has_state_param=has_state_param,
         )
-

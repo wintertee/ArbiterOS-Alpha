@@ -10,7 +10,6 @@ Usage:
     uv run -m arbiteros_alpha.transform path/to/agent.py --dry-run
 """
 
-import os
 import sys
 from pathlib import Path
 from typing import Literal
@@ -32,26 +31,30 @@ from .parser import AgentParser
 @click.command()
 @click.argument("file_path", type=click.Path(exists=True, path_type=Path))
 @click.option(
-    "--type", "-t",
+    "--type",
+    "-t",
     "agent_type",
     type=click.Choice(["langgraph", "vanilla", "auto"]),
     default="auto",
     help="Agent type: langgraph, vanilla, or auto-detect (default: auto)",
 )
 @click.option(
-    "--manual", "-m",
+    "--manual",
+    "-m",
     is_flag=True,
     default=False,
     help="Use manual classification instead of LLM",
 )
 @click.option(
-    "--yes", "-y",
+    "--yes",
+    "-y",
     is_flag=True,
     default=False,
     help="Skip confirmation prompts (non-interactive mode)",
 )
 @click.option(
-    "--dry-run", "-n",
+    "--dry-run",
+    "-n",
     is_flag=True,
     default=False,
     help="Show what would be done without modifying files",
@@ -72,7 +75,8 @@ from .parser import AgentParser
     help="Model to use for classification (default: gpt-4o)",
 )
 @click.option(
-    "--verbose", "-v",
+    "--verbose",
+    "-v",
     is_flag=True,
     default=True,
     help="Verbose output (default: True)",
@@ -130,7 +134,9 @@ def main(
 
         # Check if already transformed
         if parsed.has_existing_arbiteros:
-            logger.warning("File already has ArbiterOS imports. Skipping import addition.")
+            logger.warning(
+                "File already has ArbiterOS imports. Skipping import addition."
+            )
 
         # Filter to node functions only
         node_functions = [f for f in parsed.functions if f.is_node_function]
@@ -223,7 +229,9 @@ def main(
                         if new_type != "(keep current)":
                             classifications[func.name] = NodeClassification(
                                 instruction_type=new_type,
-                                core=InstructionClassifier.get_instruction_core(new_type),
+                                core=InstructionClassifier.get_instruction_core(
+                                    new_type
+                                ),
                                 confidence=1.0,
                                 reasoning="Manually edited",
                             )
@@ -275,4 +283,3 @@ def main(
 
 if __name__ == "__main__":
     main()
-

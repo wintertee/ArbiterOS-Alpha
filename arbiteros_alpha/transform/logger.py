@@ -5,13 +5,10 @@ transformation pipeline using the Rich library.
 """
 
 from dataclasses import dataclass
-from typing import Any
 
 from rich.console import Console
 from rich.panel import Panel
-from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.table import Table
-from rich.text import Text
 
 
 @dataclass
@@ -95,19 +92,29 @@ class TransformLogger:
         """
         if self.verbose:
             names = ", ".join(function_names) if function_names else "(none)"
-            self.console.print(f"      [green]✓[/green] Found {len(function_names)} functions: {names}")
+            self.console.print(
+                f"      [green]✓[/green] Found {len(function_names)} functions: {names}"
+            )
 
-    def detected_agent_type(self, agent_type: str, compile_line: int | None = None) -> None:
+    def detected_agent_type(
+        self, agent_type: str, compile_line: int | None = None
+    ) -> None:
         """Log the detected agent type.
 
         Args:
             agent_type: Either "langgraph" or "vanilla".
             compile_line: Line number of compile() call for LangGraph agents.
         """
-        type_display = "LangGraph-based agent" if agent_type == "langgraph" else "Vanilla Python agent"
+        type_display = (
+            "LangGraph-based agent"
+            if agent_type == "langgraph"
+            else "Vanilla Python agent"
+        )
         self.console.print(f"      [green]✓[/green] Detected: {type_display}")
         if compile_line and self.verbose:
-            self.console.print(f"      [green]✓[/green] Compile location: line {compile_line}")
+            self.console.print(
+                f"      [green]✓[/green] Compile location: line {compile_line}"
+            )
 
     def step_classifying(self) -> None:
         """Log the start of classification step."""
@@ -133,7 +140,13 @@ class TransformLogger:
 
         for result in results:
             confidence_pct = f"{result.confidence * 100:.0f}%"
-            confidence_style = "green" if result.confidence >= 0.8 else "yellow" if result.confidence >= 0.6 else "red"
+            confidence_style = (
+                "green"
+                if result.confidence >= 0.8
+                else "yellow"
+                if result.confidence >= 0.6
+                else "red"
+            )
             table.add_row(
                 result.function_name,
                 result.instruction_type,
@@ -156,14 +169,18 @@ class TransformLogger:
         Returns:
             User's choice: 'y' for yes, 'n' for no, 'e' for edit.
         """
-        self.console.print("      Accept classifications? [Y]es / [N]o / [E]dit: ", end="")
+        self.console.print(
+            "      Accept classifications? [Y]es / [N]o / [E]dit: ", end=""
+        )
         try:
             response = input().strip().lower()
             return response if response in ("y", "n", "e", "yes", "no", "edit") else "y"
         except EOFError:
             return "y"
 
-    def prompt_manual_classification(self, function_name: str, options: list[str]) -> str:
+    def prompt_manual_classification(
+        self, function_name: str, options: list[str]
+    ) -> str:
         """Prompt user to manually select instruction type.
 
         Args:
@@ -173,7 +190,9 @@ class TransformLogger:
         Returns:
             Selected instruction type.
         """
-        self.console.print(f"\n      [bold]Select instruction type for '{function_name}':[/bold]")
+        self.console.print(
+            f"\n      [bold]Select instruction type for '{function_name}':[/bold]"
+        )
         for i, option in enumerate(options, 1):
             self.console.print(f"        {i}. {option}")
         self.console.print("      Enter number: ", end="")
@@ -276,5 +295,6 @@ class TransformLogger:
         Args:
             message: The step message to display.
         """
-        self.console.print(f"[bold][{self._current_step}/{self._total_steps}][/bold] {message}")
-
+        self.console.print(
+            f"[bold][{self._current_step}/{self._total_steps}][/bold] {message}"
+        )

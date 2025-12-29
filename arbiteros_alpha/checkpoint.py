@@ -147,9 +147,7 @@ class CheckpointManager:
         )
         return checkpoint_id
 
-    def get_state_history(
-        self, thread_id: str | None = None
-    ) -> list[StateSnapshot]:
+    def get_state_history(self, thread_id: str | None = None) -> list[StateSnapshot]:
         """Retrieve all checkpoints for a thread in chronological order.
 
         Args:
@@ -280,7 +278,7 @@ class CheckpointManager:
             checkpoint_id=new_checkpoint_id,
             thread_id=fork_thread_id,
             timestamp=timestamp,
-            node_name=f"fork_point",
+            node_name="fork_point",
             values=forked_state,
             next_nodes=original_entry.snapshot.next_nodes,
             parent_checkpoint_id=checkpoint_id,
@@ -357,14 +355,15 @@ class CheckpointManager:
             entry = self.checkpoints.get(cp_id)
             if entry:
                 snapshot = entry.snapshot
-                rows.append({
-                    "time": snapshot.timestamp.strftime("%Y-%m-%d %H:%M:%S"),
-                    "node": snapshot.node_name,
-                    "checkpoint_id": snapshot.checkpoint_id,
-                    "checkpoint_id_short": snapshot.checkpoint_id[:12] + "...",
-                    "thread_id": snapshot.thread_id[:8] + "...",
-                    "next_nodes": ", ".join(snapshot.next_nodes) or "(end)",
-                    "is_fork": snapshot.metadata.get("fork_type") is not None,
-                })
+                rows.append(
+                    {
+                        "time": snapshot.timestamp.strftime("%Y-%m-%d %H:%M:%S"),
+                        "node": snapshot.node_name,
+                        "checkpoint_id": snapshot.checkpoint_id,
+                        "checkpoint_id_short": snapshot.checkpoint_id[:12] + "...",
+                        "thread_id": snapshot.thread_id[:8] + "...",
+                        "next_nodes": ", ".join(snapshot.next_nodes) or "(end)",
+                        "is_fork": snapshot.metadata.get("fork_type") is not None,
+                    }
+                )
         return rows
-
