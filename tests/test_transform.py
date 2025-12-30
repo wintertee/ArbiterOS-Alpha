@@ -15,13 +15,11 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from arbiteros_alpha.transform.classifier import (
-    ClassificationConfig,
-    InstructionClassifier,
     NodeClassification,
 )
-from arbiteros_alpha.transform.generator import CodeGenerator, TransformResult
+from arbiteros_alpha.transform.generator import CodeGenerator
 from arbiteros_alpha.transform.logger import ClassificationResult, TransformLogger
-from arbiteros_alpha.transform.parser import AgentParser, ParsedAgent, ParsedFunction
+from arbiteros_alpha.transform.parser import AgentParser
 
 
 # ============================================================================
@@ -156,7 +154,9 @@ class TestAgentParser:
         assert generate_func.is_node_function is True
         assert generate_func.has_state_param is True
 
-    def test_parse_source_detects_existing_arbiteros(self, sample_with_existing_arbiteros):
+    def test_parse_source_detects_existing_arbiteros(
+        self, sample_with_existing_arbiteros
+    ):
         """Test that existing ArbiterOS imports are detected."""
         parser = AgentParser()
         result = parser.parse_source(sample_with_existing_arbiteros)
@@ -322,7 +322,9 @@ class TestCodeGenerator:
         finally:
             temp_path.unlink()
 
-    def test_transform_skips_imports_if_already_present(self, sample_with_existing_arbiteros):
+    def test_transform_skips_imports_if_already_present(
+        self, sample_with_existing_arbiteros
+    ):
         """Test that transform skips adding imports if already present."""
         parser = AgentParser()
         parsed = parser.parse_source(sample_with_existing_arbiteros)
@@ -397,15 +399,17 @@ class TestTransformLogger:
         logger.step_parsing("test.py")
         logger.found_functions(["generate", "verify"])
         logger.detected_agent_type("langgraph", compile_line=10)
-        logger.show_classifications([
-            ClassificationResult(
-                function_name="generate",
-                instruction_type="GENERATE",
-                core="CognitiveCore",
-                confidence=0.9,
-                reasoning="",
-            ),
-        ])
+        logger.show_classifications(
+            [
+                ClassificationResult(
+                    function_name="generate",
+                    instruction_type="GENERATE",
+                    core="CognitiveCore",
+                    confidence=0.9,
+                    reasoning="",
+                ),
+            ]
+        )
         logger.complete("modified.py", "backup.py")
         logger.error("Test error")
         logger.warning("Test warning")
@@ -434,4 +438,3 @@ class TestTransformLogger:
         # Verbose logger should print, quiet should not
         assert logger_verbose.verbose is True
         assert logger_quiet.verbose is False
-
