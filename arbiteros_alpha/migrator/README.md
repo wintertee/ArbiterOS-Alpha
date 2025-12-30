@@ -1,11 +1,11 @@
 ## Introduction
 
-The transform module automates the process of adding ArbiterOS governance to existing agent code. Instead of manually adding `@os.instruction()` decorators and OS initialization, you can run a single command that:
+The migrator module automates the process of adding ArbiterOS governance to existing agent code. Instead of manually adding `@os.instruction()` decorators and OS initialization, you can run a single command that:
 
 1. **Parses** your Python file to detect agent type (LangGraph or vanilla)
 2. **Extracts** all node functions that need classification
 3. **Classifies** each function into an appropriate instruction type (using LLM or manual selection)
-4. **Transforms** the code by adding imports, OS initialization, decorators, and registration calls
+4. **Migrates** the code by adding imports, OS initialization, decorators, and registration calls
 5. **Creates** a backup of your original file
 
 This makes migration to ArbiterOS seamless and reduces the chance of errors.
@@ -14,36 +14,36 @@ This makes migration to ArbiterOS seamless and reduces the chance of errors.
 
 ### Basic Usage
 
-Transform a LangGraph agent with automatic LLM classification:
+Migrate a LangGraph agent with automatic LLM classification:
 
 ```bash
-uv run -m arbiteros_alpha.transform path/to/agent.py
+uv run -m arbiteros_alpha.migrator path/to/agent.py
 ```
 
-Transform with manual classification (interactive prompts):
+Migrate with manual classification (interactive prompts):
 
 ```bash
-uv run -m arbiteros_alpha.transform path/to/agent.py --manual
+uv run -m arbiteros_alpha.migrator path/to/agent.py --manual
 ```
 
 Preview changes without modifying files:
 
 ```bash
-uv run -m arbiteros_alpha.transform path/to/agent.py --dry-run
+uv run -m arbiteros_alpha.migrator path/to/agent.py --dry-run
 ```
 
 Non-interactive mode (skip confirmations):
 
 ```bash
-uv run -m arbiteros_alpha.transform path/to/agent.py --yes
+uv run -m arbiteros_alpha.migrator path/to/agent.py --yes
 ```
 
 ### Programmatic Usage
 
 ```python
-from arbiteros_alpha.transform.parser import AgentParser
-from arbiteros_alpha.transform.classifier import InstructionClassifier, ClassificationConfig
-from arbiteros_alpha.transform.generator import CodeGenerator
+from arbiteros_alpha.migrator.parser import AgentParser
+from arbiteros_alpha.migrator.classifier import InstructionClassifier, ClassificationConfig
+from arbiteros_alpha.migrator.generator import CodeGenerator
 
 # Parse the agent
 parser = AgentParser()
@@ -57,7 +57,7 @@ for func in parsed.functions:
     if func.is_node_function:
         classifications[func.name] = classifier.classify(func)
 
-# Transform the code
+# Migrate the code
 generator = CodeGenerator()
 result = generator.transform(
     file_path="my_agent.py",
@@ -67,12 +67,12 @@ result = generator.transform(
 )
 
 if result.success:
-    print(f"Transformed! Backup: {result.backup_file}")
+    print(f"Migrated! Backup: {result.backup_file}")
 ```
 
 ## Usage Examples
 
-### Example 1: LangGraph Agent Transformation
+### Example 1: LangGraph Agent Migration
 
 **Before:**
 
@@ -91,7 +91,7 @@ builder.add_node("verify", verify)
 graph = builder.compile()
 ```
 
-**After transformation:**
+**After migration:**
 
 ```python
 from langgraph.graph import StateGraph, END, START
@@ -115,7 +115,7 @@ graph = builder.compile()
 os.register_compiled_graph(graph)
 ```
 
-### Example 2: Vanilla Agent Transformation
+### Example 2: Vanilla Agent Migration
 
 **Before:**
 
@@ -131,7 +131,7 @@ state.update(generate(state))
 state.update(verify(state))
 ```
 
-**After transformation:**
+**After migration:**
 
 ```python
 from arbiteros_alpha import ArbiterOSAlpha
@@ -170,7 +170,7 @@ Enter number: 1
 Use `--dry-run` to see what changes would be made:
 
 ```bash
-$ uv run -m arbiteros_alpha.transform agent.py --dry-run
+$ uv run -m arbiteros_alpha.migrator agent.py --dry-run
 
 Dry run complete - no files modified
 Changes that would be made:

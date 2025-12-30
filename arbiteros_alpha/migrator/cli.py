@@ -1,13 +1,13 @@
-"""CLI interface for ArbiterOS transformation tool.
+"""CLI interface for ArbiterOS migration tool.
 
-This module provides a Click-based command-line interface for transforming
+This module provides a Click-based command-line interface for migrating
 existing agents into ArbiterOS-governed agents.
 
 Usage:
-    uv run -m arbiteros_alpha.transform path/to/agent.py
-    uv run -m arbiteros_alpha.transform path/to/agent.py --manual
-    uv run -m arbiteros_alpha.transform path/to/agent.py --yes
-    uv run -m arbiteros_alpha.transform path/to/agent.py --dry-run
+    uv run -m arbiteros_alpha.migrator path/to/agent.py
+    uv run -m arbiteros_alpha.migrator path/to/agent.py --manual
+    uv run -m arbiteros_alpha.migrator path/to/agent.py --yes
+    uv run -m arbiteros_alpha.migrator path/to/agent.py --dry-run
 """
 
 import sys
@@ -24,7 +24,7 @@ from .classifier import (
     ALL_INSTRUCTION_TYPES,
 )
 from .generator import CodeGenerator
-from .logger import ClassificationResult, TransformLogger
+from .logger import ClassificationResult, MigrationLogger
 from .parser import AgentParser
 
 
@@ -92,26 +92,26 @@ def main(
     model: str,
     verbose: bool,
 ) -> None:
-    """Transform an agent file to use ArbiterOS governance.
+    """Migrate an agent file to use ArbiterOS governance.
 
-    FILE_PATH is the path to the Python agent file to transform.
+    FILE_PATH is the path to the Python agent file to migrate.
 
     Examples:
 
         # Auto-detect agent type and use LLM classification
-        uv run -m arbiteros_alpha.transform my_agent.py
+        uv run -m arbiteros_alpha.migrator my_agent.py
 
         # Manual classification (interactive prompts)
-        uv run -m arbiteros_alpha.transform my_agent.py --manual
+        uv run -m arbiteros_alpha.migrator my_agent.py --manual
 
         # Non-interactive with LLM
-        uv run -m arbiteros_alpha.transform my_agent.py --yes
+        uv run -m arbiteros_alpha.migrator my_agent.py --yes
 
         # Preview changes without modifying
-        uv run -m arbiteros_alpha.transform my_agent.py --dry-run
+        uv run -m arbiteros_alpha.migrator my_agent.py --dry-run
     """
     console = Console()
-    logger = TransformLogger(console=console, verbose=verbose)
+    logger = MigrationLogger(console=console, verbose=verbose)
 
     try:
         # Start
@@ -141,7 +141,7 @@ def main(
         # Filter to node functions only
         node_functions = [f for f in parsed.functions if f.is_node_function]
         if not node_functions:
-            logger.warning("No node functions found to transform.")
+            logger.warning("No node functions found to migrate.")
             if not parsed.functions:
                 logger.error("No functions found in file.")
                 sys.exit(1)
@@ -212,7 +212,7 @@ def main(
             logger.step_confirmation()
             response = logger.prompt_confirmation()
             if response in ("n", "no"):
-                logger.info("Transformation cancelled.")
+                logger.info("Migration cancelled.")
                 sys.exit(0)
             elif response in ("e", "edit"):
                 # Allow editing each classification
@@ -264,7 +264,7 @@ def main(
                     logger.transformation_action(change)
                 logger.complete(result.modified_file, result.backup_file)
             else:
-                logger.error(f"Transformation failed: {result.error}")
+                logger.error(f"Migration failed: {result.error}")
                 sys.exit(1)
 
     except FileNotFoundError as e:
@@ -274,7 +274,7 @@ def main(
         logger.error(f"Invalid Python syntax: {e}")
         sys.exit(1)
     except KeyboardInterrupt:
-        logger.info("\nTransformation cancelled.")
+        logger.info("\nMigration cancelled.")
         sys.exit(130)
     except Exception as e:
         logger.error(f"Unexpected error: {e}")

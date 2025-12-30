@@ -1,10 +1,10 @@
-"""Unit tests for the transform module.
+"""Unit tests for the migrator module.
 
 Tests cover:
 - AgentParser: AST parsing, agent type detection, function extraction
 - InstructionClassifier: LLM classification (mocked), manual classification, utilities
-- CodeGenerator: Code transformation, backup creation, dry-run mode
-- TransformLogger: Logging output and formatting
+- CodeGenerator: Code migration, backup creation, dry-run mode
+- MigrationLogger: Logging output and formatting
 - CLI: Basic integration tests with mocked dependencies
 """
 
@@ -14,12 +14,12 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from arbiteros_alpha.transform.classifier import (
+from arbiteros_alpha.migrator.classifier import (
     NodeClassification,
 )
-from arbiteros_alpha.transform.generator import CodeGenerator
-from arbiteros_alpha.transform.logger import ClassificationResult, TransformLogger
-from arbiteros_alpha.transform.parser import AgentParser
+from arbiteros_alpha.migrator.generator import CodeGenerator
+from arbiteros_alpha.migrator.logger import ClassificationResult, MigrationLogger
+from arbiteros_alpha.migrator.parser import AgentParser
 
 
 # ============================================================================
@@ -377,23 +377,23 @@ class TestCodeGenerator:
 
 
 # ============================================================================
-# Test TransformLogger
+# Test MigrationLogger
 # ============================================================================
 
 
-class TestTransformLogger:
-    """Test cases for TransformLogger class."""
+class TestMigrationLogger:
+    """Test cases for MigrationLogger class."""
 
     def test_logger_initialization(self):
         """Test that logger initializes correctly."""
-        logger = TransformLogger(verbose=True)
+        logger = MigrationLogger(verbose=True)
         assert logger.verbose is True
         assert logger._current_step == 0
 
     def test_logger_methods_call_console_print(self):
         """Test that logger methods call console.print."""
         console = MagicMock()
-        logger = TransformLogger(console=console, verbose=True)
+        logger = MigrationLogger(console=console, verbose=True)
 
         logger.start()
         logger.step_parsing("test.py")
@@ -420,7 +420,7 @@ class TestTransformLogger:
     def test_prompt_confirmation_returns_user_input(self):
         """Test that prompt_confirmation returns user input."""
         console = MagicMock()
-        logger = TransformLogger(console=console)
+        logger = MigrationLogger(console=console)
 
         with patch("builtins.input", return_value="y"):
             result = logger.prompt_confirmation()
@@ -429,8 +429,8 @@ class TestTransformLogger:
     def test_info_only_logs_when_verbose(self):
         """Test that info only logs when verbose is True."""
         console = MagicMock()
-        logger_verbose = TransformLogger(console=console, verbose=True)
-        logger_quiet = TransformLogger(console=console, verbose=False)
+        logger_verbose = MigrationLogger(console=console, verbose=True)
+        logger_quiet = MigrationLogger(console=console, verbose=False)
 
         logger_verbose.info("Test info")
         logger_quiet.info("Test info")

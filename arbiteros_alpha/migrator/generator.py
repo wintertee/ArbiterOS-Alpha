@@ -1,6 +1,6 @@
-"""Code generator for transforming agents to ArbiterOS-governed agents.
+"""Code generator for migrating agents to ArbiterOS-governed agents.
 
-This module handles the actual code transformation, including:
+This module handles the actual code migration, including:
 - Adding imports
 - Adding OS initialization
 - Adding @os.instruction() decorators
@@ -18,15 +18,15 @@ from .parser import ParsedAgent
 
 
 @dataclass
-class TransformResult:
-    """Result of a code transformation.
+class MigrationResult:
+    """Result of a code migration.
 
     Attributes:
-        success: Whether the transformation succeeded.
+        success: Whether the migration succeeded.
         modified_file: Path to the modified file.
         backup_file: Path to the backup file.
         changes: List of changes made.
-        error: Error message if transformation failed.
+        error: Error message if migration failed.
     """
 
     success: bool
@@ -69,8 +69,8 @@ class CodeGenerator:
         parsed_agent: ParsedAgent,
         classifications: dict[str, NodeClassification],
         dry_run: bool = False,
-    ) -> TransformResult:
-        """Transform a file to add ArbiterOS governance.
+    ) -> MigrationResult:
+        """Migrate a file to add ArbiterOS governance.
 
         Args:
             file_path: Path to the source file.
@@ -79,7 +79,7 @@ class CodeGenerator:
             dry_run: If True, don't modify files, just return what would change.
 
         Returns:
-            TransformResult with details of the transformation.
+            MigrationResult with details of the migration.
         """
         file_path = Path(file_path)
         changes: list[str] = []
@@ -179,7 +179,7 @@ class CodeGenerator:
             new_source = "\n".join(source_lines)
 
             if dry_run:
-                return TransformResult(
+                return MigrationResult(
                     success=True,
                     modified_file=str(file_path),
                     backup_file="",
@@ -196,7 +196,7 @@ class CodeGenerator:
             # Write transformed file
             file_path.write_text(new_source, encoding="utf-8")
 
-            return TransformResult(
+            return MigrationResult(
                 success=True,
                 modified_file=str(file_path),
                 backup_file=str(backup_path),
@@ -204,7 +204,7 @@ class CodeGenerator:
             )
 
         except Exception as e:
-            return TransformResult(
+            return MigrationResult(
                 success=False,
                 error=str(e),
                 changes=changes,

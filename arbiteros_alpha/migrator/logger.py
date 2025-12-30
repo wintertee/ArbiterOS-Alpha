@@ -1,7 +1,7 @@
-"""Rich-based progress logger for transformation pipeline.
+"""Rich-based progress logger for migration pipeline.
 
 This module provides beautiful, real-time progress logging for the
-transformation pipeline using the Rich library.
+migration pipeline using the Rich library.
 """
 
 from dataclasses import dataclass
@@ -30,14 +30,14 @@ class ClassificationResult:
     reasoning: str = ""
 
 
-class TransformLogger:
-    """Rich-based logger for transformation progress.
+class MigrationLogger:
+    """Rich-based logger for migration progress.
 
-    Provides step-by-step visual feedback during the transformation process
+    Provides step-by-step visual feedback during the migration process
     with tables, progress indicators, and styled output.
 
     Example:
-        >>> logger = TransformLogger()
+        >>> logger = MigrationLogger()
         >>> logger.start()
         >>> logger.step_parsing("agent.py")
         >>> logger.found_functions(["generate", "verify", "execute"])
@@ -51,7 +51,7 @@ class TransformLogger:
     """
 
     def __init__(self, console: Console | None = None, verbose: bool = True) -> None:
-        """Initialize the TransformLogger.
+        """Initialize the MigrationLogger.
 
         Args:
             console: Optional Rich Console instance. Creates new one if not provided.
@@ -63,11 +63,11 @@ class TransformLogger:
         self._total_steps = 5
 
     def start(self) -> None:
-        """Display the transformation tool header."""
+        """Display the migration tool header."""
         self.console.print()
         self.console.print(
             Panel.fit(
-                "[bold cyan]ArbiterOS Transformation Tool[/bold cyan]",
+                "[bold cyan]ArbiterOS Migration Tool[/bold cyan]",
                 border_style="cyan",
             )
         )
@@ -238,7 +238,7 @@ class TransformLogger:
         self.console.print()
         self.console.print(
             Panel(
-                f"[green]✓ Transformation complete![/green]\n"
+                f"[green]✓ Migration complete![/green]\n"
                 f"[dim]Modified: {modified_file}[/dim]\n"
                 f"[dim]Backup: {backup_file}[/dim]",
                 border_style="green",
