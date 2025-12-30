@@ -7,7 +7,7 @@ into ArbiterOS-governed agents with automatic instruction type classification.
 from .classifier import InstructionClassifier, NodeClassification
 from .generator import CodeGenerator, MigrationResult
 from .logger import MigrationLogger
-from .parser import ParsedAgent, ParsedFunction, AgentParser
+from .parser import AgentParser, ParsedAgent, ParsedFunction
 
 __all__ = [
     "AgentParser",

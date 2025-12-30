@@ -18,10 +18,10 @@ import click
 from rich.console import Console
 
 from .classifier import (
+    ALL_INSTRUCTION_TYPES,
     ClassificationConfig,
     InstructionClassifier,
     NodeClassification,
-    ALL_INSTRUCTION_TYPES,
 )
 from .generator import CodeGenerator
 from .logger import ClassificationResult, MigrationLogger

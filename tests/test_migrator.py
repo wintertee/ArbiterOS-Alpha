@@ -21,7 +21,6 @@ from arbiteros_alpha.migrator.generator import CodeGenerator
 from arbiteros_alpha.migrator.logger import ClassificationResult, MigrationLogger
 from arbiteros_alpha.migrator.parser import AgentParser
 
-
 # ============================================================================
 # Test Fixtures
 # ============================================================================
