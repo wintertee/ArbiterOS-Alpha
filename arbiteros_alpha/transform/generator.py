@@ -13,8 +13,8 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 
-from .classifier import NodeClassification, INSTRUCTION_TO_CORE
-from .parser import ParsedAgent, ParsedFunction
+from .classifier import NodeClassification
+from .parser import ParsedAgent
 
 
 @dataclass
@@ -122,7 +122,9 @@ class CodeGenerator:
                 for i, line in enumerate(os_init_lines):
                     source_lines.insert(insert_pos + i, line)
                     if line.strip():
-                        changes.append(f"Added OS initialization at line {insert_pos + i + 1}")
+                        changes.append(
+                            f"Added OS initialization at line {insert_pos + i + 1}"
+                        )
                 offset += len(os_init_lines)
 
             # 3. Add decorators to functions
@@ -151,7 +153,9 @@ class CodeGenerator:
                 decorator = f"@os.instruction(Instr.{instr_type})"
 
                 source_lines.insert(insert_line, decorator)
-                changes.append(f"Added @os.instruction(Instr.{instr_type}) to {func.name}")
+                changes.append(
+                    f"Added @os.instruction(Instr.{instr_type}) to {func.name}"
+                )
                 decorators_added += 1
 
             # Update total offset with all decorators added
@@ -184,7 +188,9 @@ class CodeGenerator:
 
             # Create backup
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            backup_path = file_path.with_name(f"{file_path.stem}_backup_{timestamp}{file_path.suffix}")
+            backup_path = file_path.with_name(
+                f"{file_path.stem}_backup_{timestamp}{file_path.suffix}"
+            )
             shutil.copy2(file_path, backup_path)
 
             # Write transformed file
@@ -265,7 +271,8 @@ class CodeGenerator:
         if parsed_agent.agent_type == "langgraph" and parsed_agent.compile_lineno:
             compile_adjusted = parsed_agent.compile_lineno + offset
             graph_var = parsed_agent.graph_variable or "graph"
-            source_lines.insert(compile_adjusted, f"os.register_compiled_graph({graph_var})")
+            source_lines.insert(
+                compile_adjusted, f"os.register_compiled_graph({graph_var})"
+            )
 
         return "\n".join(source_lines)
-

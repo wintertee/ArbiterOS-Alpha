@@ -6,7 +6,6 @@ ArbiterOS instruction types using LLM inference with structured output.
 
 import os
 from dataclasses import dataclass
-from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -87,8 +86,7 @@ class NodeClassification(BaseModel):
         description="The core this instruction belongs to (e.g., CognitiveCore, NormativeCore)"
     )
     confidence: float = Field(
-        ge=0.0, le=1.0,
-        description="Confidence score from 0.0 to 1.0"
+        ge=0.0, le=1.0, description="Confidence score from 0.0 to 1.0"
     )
     reasoning: str = Field(
         description="Brief explanation for why this classification was chosen"
@@ -184,7 +182,9 @@ class InstructionClassifier:
         result = structured_llm.invoke(prompt)
         return result
 
-    def classify_batch(self, functions: list[ParsedFunction]) -> list[NodeClassification]:
+    def classify_batch(
+        self, functions: list[ParsedFunction]
+    ) -> list[NodeClassification]:
         """Classify multiple functions.
 
         Args:
@@ -195,7 +195,9 @@ class InstructionClassifier:
         """
         return [self.classify(func) for func in functions]
 
-    def classify_manual(self, function: ParsedFunction, instruction_type: str) -> NodeClassification:
+    def classify_manual(
+        self, function: ParsedFunction, instruction_type: str
+    ) -> NodeClassification:
         """Create a classification with manual input.
 
         Args:
@@ -285,4 +287,3 @@ Provide your classification with:
             The core name, or "CognitiveCore" as default.
         """
         return INSTRUCTION_TO_CORE.get(instruction_type, "CognitiveCore")
-
