@@ -12,6 +12,36 @@ All Python commands must be executed using `uv run` to ensure consistent environ
 
 All code comments and docstrings must follow [Google Python Style Guide](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings).
 
+**Important: Use Code Blocks for Examples**
+
+In docstrings, always use triple backticks for code examples instead of doctest format:
+
+```python
+# ✅ Good: Use code blocks
+def example_function():
+    """Short description.
+    
+    Example:
+        ```python
+        result = example_function()
+        print(result)
+        ```
+    """
+    pass
+
+# ❌ Bad: Don't use doctest format
+def example_function():
+    """Short description.
+    
+    Example:
+        >>> result = example_function()
+        >>> print(result)
+    """
+    pass
+```
+
+**Reason:** Code blocks work better with mkdocstrings and avoid cross-reference warnings during documentation builds.
+
 ### 3. Test-Driven Development
 
 **Every new feature MUST include:**
