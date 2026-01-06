@@ -1,6 +1,6 @@
 import os
 import getpass
-from typing import List, Sequence
+from typing import List
 from typing_extensions import TypedDict, Annotated
 
 from langchain_core.messages import BaseMessage, HumanMessage, AIMessage
@@ -14,6 +14,7 @@ def _set_if_undefined(var: str):
     """Prompts for environment variables if they are not set."""
     if not os.environ.get(var):
         os.environ[var] = getpass.getpass(f"Please enter your {var}: ")
+
 
 _set_if_undefined("OPENAI_API_KEY")
 _set_if_undefined("LANGFUSE_PUBLIC_KEY")
@@ -55,6 +56,7 @@ class State(TypedDict):
     # The state tracks the list of messages exchanged
     messages: Annotated[List[BaseMessage], add_messages]
 
+
 def generation_node(state: State):
     """
     Node that generates the essay based on the current conversation history.
@@ -68,14 +70,14 @@ def reflection_node(state: State):
     It maps the last AI message to a HumanMessage so the 'teacher' LLM sees it as a submission.
     """
     cls_map = {"ai": HumanMessage, "human": AIMessage}
-    
+
     last_message = state["messages"][-1]
     translated_message = cls_map[last_message.type](content=last_message.content)
-    
+
     critique_input = [state["messages"][0], translated_message]
-    
+
     res = reflect_chain.invoke(critique_input)
-    
+
     return {"messages": [HumanMessage(content=res.content)]}
 
 
@@ -102,11 +104,13 @@ graph = builder.compile()
 
 
 def main():
-    user_request = "Write an essay on why the little prince is relevant in modern childhood"
+    user_request = (
+        "Write an essay on why the little prince is relevant in modern childhood"
+    )
     inputs = {"messages": [HumanMessage(content=user_request)]}
-    
+
     graph.stream(inputs)
-    
+
     graph.invoke(inputs)
 
 

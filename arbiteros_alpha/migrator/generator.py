@@ -184,7 +184,7 @@ class CodeGenerator:
                     if not parsed_agent.has_existing_arbiteros:
                         # We added OS init, so insert after it
                         insert_pos += os_init_line_count
-                    
+
                     langfuse_lines = [
                         "",
                         "langfuse_handler = CallbackHandler()",
@@ -213,27 +213,37 @@ class CodeGenerator:
                 offset += 1
 
             # 6. Add langfuse_handler to graph invocation calls (simple single-line modification)
-            if not parsed_agent.has_existing_langfuse and parsed_agent.graph_invocation_lines:
+            if (
+                not parsed_agent.has_existing_langfuse
+                and parsed_agent.graph_invocation_lines
+            ):
                 # Process in reverse order to maintain line numbers
-                for invoc_line in sorted(parsed_agent.graph_invocation_lines, reverse=True):
+                for invoc_line in sorted(
+                    parsed_agent.graph_invocation_lines, reverse=True
+                ):
                     adjusted_line = invoc_line - 1 + offset
                     if adjusted_line < len(source_lines):
                         original_line = source_lines[adjusted_line]
                         # Only modify if it's a single-line call (simple heuristic)
-                        if (".stream(" in original_line or ".invoke(" in original_line) and original_line.count("\n") == 0:
+                        if (
+                            ".stream(" in original_line or ".invoke(" in original_line
+                        ) and original_line.count("\n") == 0:
                             # Check if config already exists
                             if "config=" in original_line:
                                 # Add langfuse_handler to existing config if callbacks not present
-                                if "langfuse_handler" not in original_line and "callbacks" not in original_line:
+                                if (
+                                    "langfuse_handler" not in original_line
+                                    and "callbacks" not in original_line
+                                ):
                                     # Simple insertion: add callbacks to config dict
                                     config_pos = original_line.find("config=")
                                     if config_pos != -1:
                                         brace_pos = original_line.find("{", config_pos)
                                         if brace_pos != -1:
                                             new_line = (
-                                                original_line[:brace_pos + 1]
+                                                original_line[: brace_pos + 1]
                                                 + '"callbacks": [langfuse_handler], '
-                                                + original_line[brace_pos + 1:]
+                                                + original_line[brace_pos + 1 :]
                                             )
                                             source_lines[adjusted_line] = new_line
                                             changes.append(
@@ -327,7 +337,11 @@ class CodeGenerator:
         first_func_line = min((f.lineno for f in parsed_agent.functions), default=None)
         if first_func_line is not None:
             backend = parsed_agent.agent_type
-            os_init_lines = ["", f'arbiter_os = ArbiterOSAlpha(backend="{backend}")', ""]
+            os_init_lines = [
+                "",
+                f'arbiter_os = ArbiterOSAlpha(backend="{backend}")',
+                "",
+            ]
             insert_pos = first_func_line - 1 + offset
             for i, line in enumerate(os_init_lines):
                 source_lines.insert(insert_pos + i, line)
@@ -359,7 +373,9 @@ class CodeGenerator:
             if classification is None:
                 continue
             insert_line = func.lineno - 1 + offset
-            decorator = f"@arbiter_os.instruction(Instr.{classification.instruction_type})"
+            decorator = (
+                f"@arbiter_os.instruction(Instr.{classification.instruction_type})"
+            )
             source_lines.insert(insert_line, decorator)
             decorators_added += 1
 
@@ -375,22 +391,30 @@ class CodeGenerator:
             offset += 1
 
         # Add langfuse_handler to graph invocation calls (simple single-line modification)
-        if not parsed_agent.has_existing_langfuse and parsed_agent.graph_invocation_lines:
+        if (
+            not parsed_agent.has_existing_langfuse
+            and parsed_agent.graph_invocation_lines
+        ):
             for invoc_line in sorted(parsed_agent.graph_invocation_lines, reverse=True):
                 adjusted_line = invoc_line - 1 + offset
                 if adjusted_line < len(source_lines):
                     original_line = source_lines[adjusted_line]
-                    if (".stream(" in original_line or ".invoke(" in original_line) and original_line.count("\n") == 0:
+                    if (
+                        ".stream(" in original_line or ".invoke(" in original_line
+                    ) and original_line.count("\n") == 0:
                         if "config=" in original_line:
-                            if "langfuse_handler" not in original_line and "callbacks" not in original_line:
+                            if (
+                                "langfuse_handler" not in original_line
+                                and "callbacks" not in original_line
+                            ):
                                 config_pos = original_line.find("config=")
                                 if config_pos != -1:
                                     brace_pos = original_line.find("{", config_pos)
                                     if brace_pos != -1:
                                         source_lines[adjusted_line] = (
-                                            original_line[:brace_pos + 1]
+                                            original_line[: brace_pos + 1]
                                             + '"callbacks": [langfuse_handler], '
-                                            + original_line[brace_pos + 1:]
+                                            + original_line[brace_pos + 1 :]
                                         )
                         else:
                             paren_pos = original_line.rfind(")")
