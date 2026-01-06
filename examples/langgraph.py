@@ -18,7 +18,7 @@ logging.basicConfig(
 
 # 1. Setup OS
 
-os = ArbiterOSAlpha(backend="langgraph")
+arbiter_os = ArbiterOSAlpha(backend="langgraph")
 
 # Policy: Prevent direct generate->toolcall without proper flow
 history_checker = HistoryPolicyChecker(
@@ -36,8 +36,8 @@ confidence_router = MetricThresholdPolicyRouter(
 
 
 # if add this checker, intended error will be raised
-os.add_policy_checker(history_checker)
-os.add_policy_router(confidence_router)
+arbiter_os.add_policy_checker(history_checker)
+arbiter_os.add_policy_router(confidence_router)
 
 # 2. Langgraph stuff
 
@@ -51,7 +51,7 @@ class State(TypedDict):
     confidence: float
 
 
-@os.instruction(Instr.GENERATE)
+@arbiter_os.instruction(Instr.GENERATE)
 def generate(state: State) -> State:
     """Generate a response to the user query."""
 
@@ -68,13 +68,13 @@ def generate(state: State) -> State:
     return {"response": response}
 
 
-@os.instruction(Instr.TOOL_CALL)
+@arbiter_os.instruction(Instr.TOOL_CALL)
 def tool_call(state: State) -> State:
     """Call external tools to enhance the response."""
     return {"tool_result": "ok"}
 
 
-@os.instruction(Instr.EVALUATE_PROGRESS)
+@arbiter_os.instruction(Instr.EVALUATE_PROGRESS)
 def evaluate(state: State) -> State:
     """Evaluate confidence in the response quality."""
     # Heuristic: response quality based on length
@@ -97,7 +97,7 @@ builder.add_edge("evaluate", END)
 
 graph = builder.compile()
 
-os.register_compiled_graph(graph)
+arbiter_os.register_compiled_graph(graph)
 
 # 3. Run graph
 
@@ -115,4 +115,4 @@ def main():
 
 if __name__ == "__main__":
     main()
-    os.history.pprint()
+    arbiter_os.history.pprint()
