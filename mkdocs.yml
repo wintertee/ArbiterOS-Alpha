@@ -78,9 +78,12 @@ nav:
       - Migration Guide: getting-started/migration.md
   - Concepts:
       - Policy Architecture: concepts/policies.md
+      - Evaluators: concepts/evaluators.md
   - Tutorial:
       - Complete Example: examples/complete-tutorial.md
+      - Evaluator Tutorial: examples/evaluator-tutorial.md
   - API Reference:
       - Core: api/core.md
       - Instructions: api/instructions.md
       - Policy: api/policy.md
+      - Evaluation: api/evaluation.md

@@ -14,8 +14,10 @@ The main components are implemented in `arbiteros_alpha.core` and re-exported fr
         - __init__
         - add_policy_checker
         - add_policy_router
+        - add_evaluator
         - _check_before
         - _route_after
+        - _evaluate_node
         - instruction
 
 ## History
