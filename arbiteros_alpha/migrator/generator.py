@@ -103,29 +103,30 @@ class CodeGenerator:
                 source_lines.insert(import_line + offset, "")
                 offset += 1
 
-            # 2. Add OS initialization
-            # Find the first function definition line
-            first_func_line = None
-            for func in parsed_agent.functions:
-                if first_func_line is None or func.lineno < first_func_line:
-                    first_func_line = func.lineno
+            # 2. Add OS initialization (only if not already present)
+            if not parsed_agent.has_os_initialization:
+                # Find the first function definition line
+                first_func_line = None
+                for func in parsed_agent.functions:
+                    if first_func_line is None or func.lineno < first_func_line:
+                        first_func_line = func.lineno
 
-            if first_func_line is not None:
-                # Insert OS init before first function (with offset adjustment)
-                backend = parsed_agent.agent_type
-                os_init_lines = [
-                    "",
-                    f'os = ArbiterOSAlpha(backend="{backend}")',
-                    "",
-                ]
-                insert_pos = first_func_line - 1 + offset
-                for i, line in enumerate(os_init_lines):
-                    source_lines.insert(insert_pos + i, line)
-                    if line.strip():
-                        changes.append(
-                            f"Added OS initialization at line {insert_pos + i + 1}"
-                        )
-                offset += len(os_init_lines)
+                if first_func_line is not None:
+                    # Insert OS init before first function (with offset adjustment)
+                    backend = parsed_agent.agent_type
+                    os_init_lines = [
+                        "",
+                        f'os = ArbiterOSAlpha(backend="{backend}")',
+                        "",
+                    ]
+                    insert_pos = first_func_line - 1 + offset
+                    for i, line in enumerate(os_init_lines):
+                        source_lines.insert(insert_pos + i, line)
+                        if line.strip():
+                            changes.append(
+                                f"Added OS initialization at line {insert_pos + i + 1}"
+                            )
+                    offset += len(os_init_lines)
 
             # 3. Add decorators to functions
             # We need to process functions in reverse order (by line number)
@@ -162,7 +163,12 @@ class CodeGenerator:
             offset += decorators_added
 
             # 4. Add register_compiled_graph() for LangGraph agents
-            if parsed_agent.agent_type == "langgraph" and parsed_agent.compile_lineno:
+            # Only add if not already present
+            if (
+                parsed_agent.agent_type == "langgraph"
+                and parsed_agent.compile_lineno
+                and not parsed_agent.has_register_compiled_graph
+            ):
                 # Find the compile line with offset
                 compile_adjusted = parsed_agent.compile_lineno + offset
 
@@ -238,15 +244,18 @@ class CodeGenerator:
             source_lines.insert(import_line + offset, "")
             offset += 1
 
-        # Add OS initialization
-        first_func_line = min((f.lineno for f in parsed_agent.functions), default=None)
-        if first_func_line is not None:
-            backend = parsed_agent.agent_type
-            os_init_lines = ["", f'os = ArbiterOSAlpha(backend="{backend}")', ""]
-            insert_pos = first_func_line - 1 + offset
-            for i, line in enumerate(os_init_lines):
-                source_lines.insert(insert_pos + i, line)
-            offset += len(os_init_lines)
+        # Add OS initialization (only if not already present)
+        if not parsed_agent.has_os_initialization:
+            first_func_line = min(
+                (f.lineno for f in parsed_agent.functions), default=None
+            )
+            if first_func_line is not None:
+                backend = parsed_agent.agent_type
+                os_init_lines = ["", f'os = ArbiterOSAlpha(backend="{backend}")', ""]
+                insert_pos = first_func_line - 1 + offset
+                for i, line in enumerate(os_init_lines):
+                    source_lines.insert(insert_pos + i, line)
+                offset += len(os_init_lines)
 
         # Add decorators (reverse order)
         funcs_with_class = [
@@ -267,8 +276,12 @@ class CodeGenerator:
 
         offset += decorators_added
 
-        # Add register_compiled_graph for LangGraph
-        if parsed_agent.agent_type == "langgraph" and parsed_agent.compile_lineno:
+        # Add register_compiled_graph for LangGraph (only if not already present)
+        if (
+            parsed_agent.agent_type == "langgraph"
+            and parsed_agent.compile_lineno
+            and not parsed_agent.has_register_compiled_graph
+        ):
             compile_adjusted = parsed_agent.compile_lineno + offset
             graph_var = parsed_agent.graph_variable or "graph"
             source_lines.insert(
