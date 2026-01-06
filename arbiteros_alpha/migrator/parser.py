@@ -24,6 +24,7 @@ class ParsedFunction:
         end_lineno: The line number where the function ends.
         is_node_function: True if this function is used in add_node().
         has_state_param: True if the function accepts a state parameter.
+        is_async: True if the function is defined with async def.
     """
 
     name: str
@@ -33,6 +34,7 @@ class ParsedFunction:
     end_lineno: int
     is_node_function: bool = False
     has_state_param: bool = False
+    is_async: bool = False
 
 
 @dataclass
@@ -48,6 +50,8 @@ class ParsedAgent:
         source_lines: The original source code split into lines.
         imports_end_lineno: Line number where imports section ends.
         has_existing_arbiteros: True if file already has ArbiterOS imports.
+        has_register_compiled_graph: True if file already has register_compiled_graph call.
+        has_os_initialization: True if file already has ArbiterOSAlpha() initialization.
     """
 
     agent_type: Literal["langgraph", "vanilla"]
@@ -58,6 +62,8 @@ class ParsedAgent:
     source_lines: list[str] = field(default_factory=list)
     imports_end_lineno: int = 0
     has_existing_arbiteros: bool = False
+    has_register_compiled_graph: bool = False
+    has_os_initialization: bool = False
 
 
 class AgentParser:
@@ -123,6 +129,8 @@ class AgentParser:
         builder_variable: str | None = None
         imports_end_lineno = 0
         has_existing_arbiteros = False
+        has_register_compiled_graph = False
+        has_os_initialization = False
 
         # First pass: detect LangGraph patterns and find node functions
         for node in ast.walk(tree):
@@ -152,6 +160,14 @@ class AgentParser:
                 if self._is_compile_call(node):
                     compile_lineno = node.lineno
 
+                # Check for existing register_compiled_graph() call
+                if self._is_register_compiled_graph_call(node):
+                    has_register_compiled_graph = True
+
+                # Check for existing ArbiterOSAlpha() initialization
+                if self._is_arbiteros_init_call(node):
+                    has_os_initialization = True
+
         # Find compile assignment (graph = builder.compile())
         for node in ast.walk(tree):
             if isinstance(node, ast.Assign):
@@ -169,15 +185,16 @@ class AgentParser:
                     imports_end_lineno, node.end_lineno or node.lineno
                 )
 
-        # Second pass: extract all function definitions
+        # Second pass: extract all function definitions (both sync and async)
         functions: list[ParsedFunction] = []
         for node in ast.iter_child_nodes(tree):
-            if isinstance(node, ast.FunctionDef):
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 # Skip if already has @os.instruction decorator
                 if self._has_instruction_decorator(node):
                     continue
 
-                func = self._extract_function(node, source_code)
+                is_async = isinstance(node, ast.AsyncFunctionDef)
+                func = self._extract_function(node, source_code, is_async=is_async)
                 func.is_node_function = func.name in self._node_function_names
 
                 # For vanilla agents, consider all functions with state param as node functions
@@ -195,6 +212,8 @@ class AgentParser:
             source_lines=self._source_lines,
             imports_end_lineno=imports_end_lineno,
             has_existing_arbiteros=has_existing_arbiteros,
+            has_register_compiled_graph=has_register_compiled_graph,
+            has_os_initialization=has_os_initialization,
         )
 
     def _is_state_graph_call(self, node: ast.Call) -> bool:
@@ -217,6 +236,20 @@ class AgentParser:
             return node.func.attr == "compile"
         return False
 
+    def _is_register_compiled_graph_call(self, node: ast.Call) -> bool:
+        """Check if a Call node is a register_compiled_graph() call."""
+        if isinstance(node.func, ast.Attribute):
+            return node.func.attr == "register_compiled_graph"
+        return False
+
+    def _is_arbiteros_init_call(self, node: ast.Call) -> bool:
+        """Check if a Call node is an ArbiterOSAlpha() initialization."""
+        if isinstance(node.func, ast.Name):
+            return node.func.id == "ArbiterOSAlpha"
+        if isinstance(node.func, ast.Attribute):
+            return node.func.attr == "ArbiterOSAlpha"
+        return False
+
     def _extract_node_function_name(self, node: ast.Call) -> str | None:
         """Extract the function name from an add_node() call.
 
@@ -237,7 +270,9 @@ class AgentParser:
                         return second_arg.id
         return None
 
-    def _has_instruction_decorator(self, node: ast.FunctionDef) -> bool:
+    def _has_instruction_decorator(
+        self, node: ast.FunctionDef | ast.AsyncFunctionDef
+    ) -> bool:
         """Check if function already has @os.instruction() decorator."""
         for decorator in node.decorator_list:
             if isinstance(decorator, ast.Call):
@@ -247,7 +282,10 @@ class AgentParser:
         return False
 
     def _extract_function(
-        self, node: ast.FunctionDef, source_code: str
+        self,
+        node: ast.FunctionDef | ast.AsyncFunctionDef,
+        source_code: str,
+        is_async: bool = False,
     ) -> ParsedFunction:
         """Extract function information from an AST FunctionDef node."""
         # Get docstring
@@ -273,4 +311,5 @@ class AgentParser:
             lineno=node.lineno,
             end_lineno=end_line,
             has_state_param=has_state_param,
+            is_async=is_async,
         )

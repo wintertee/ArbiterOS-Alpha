@@ -11,12 +11,15 @@ dependencies = [
     "pydantic>=2.0.0",
     "click>=8.0.0",
     "langchain-openai>=0.1.0",
+    "langchain-community>=0.4.1",
+    "tavily-python>=0.7.17",
 ]
 
 [project.optional-dependencies]
 dev = [
     "pre-commit>=4.3.0",
     "pytest>=8.0.0",
+    "pytest-asyncio>=0.24.0",
     "mkdocs>=1.6.1",
     "mkdocs-material>=9.6.23",
     "mkdocstrings>=0.30.1",

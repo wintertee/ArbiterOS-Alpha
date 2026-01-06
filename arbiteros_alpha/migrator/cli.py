@@ -141,11 +141,20 @@ def main(
         # Filter to node functions only
         node_functions = [f for f in parsed.functions if f.is_node_function]
         if not node_functions:
+            # If file already has ArbiterOS, likely all node functions are decorated
+            # Don't fall back to state-param functions in this case
+            if parsed.has_existing_arbiteros or parsed.has_os_initialization:
+                logger.info(
+                    "No undecorated node functions found. "
+                    "File appears to be already migrated."
+                )
+                sys.exit(0)
+
             logger.warning("No node functions found to migrate.")
             if not parsed.functions:
                 logger.error("No functions found in file.")
                 sys.exit(1)
-            # Fall back to all functions with state param
+            # Fall back to all functions with state param (only for fresh files)
             node_functions = [f for f in parsed.functions if f.has_state_param]
             if not node_functions:
                 logger.info("Using all functions as potential nodes.")
