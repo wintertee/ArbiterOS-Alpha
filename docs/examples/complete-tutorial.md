@@ -34,7 +34,7 @@ logging.basicConfig(
 )
 
 # 1. Setup OS
-os = ArbiterOSAlpha()
+arbiter_os = ArbiterOSAlpha()
 
 # Policy: Prevent direct generate->toolcall without proper flow
 history_checker = HistoryPolicyChecker(
@@ -49,8 +49,8 @@ confidence_router = MetricThresholdPolicyRouter(
     target="generate",
 )
 
-os.add_policy_checker(history_checker)
-os.add_policy_router(confidence_router)
+arbiter_os.add_policy_checker(history_checker)
+arbiter_os.add_policy_router(confidence_router)
 
 # 2. Define State
 class State(TypedDict):
@@ -61,7 +61,7 @@ class State(TypedDict):
     confidence: float
 
 # 3. Define Instructions
-@os.instruction(GENERATE)
+@arbiter_os.instruction(GENERATE)
 def generate(state: State) -> dict:
     """Generate a response to the user query."""
     is_retry = bool(state.get("response"))
@@ -73,12 +73,12 @@ def generate(state: State) -> dict:
     
     return {"response": response}
 
-@os.instruction("toolcall")
+@arbiter_os.instruction("toolcall")
 def tool_call(state: State) -> dict:
     """Call external tools to enhance the response."""
     return {"tool_result": "ok"}
 
-@os.instruction("evaluate")
+@arbiter_os.instruction("evaluate")
 def evaluate(state: State) -> dict:
     """Evaluate confidence in the response quality."""
     response_length = len(state["response"])
@@ -111,7 +111,7 @@ for chunk in graph.stream(initial_state, stream_mode="values", debug=False):
 
 # 6. View History
 from arbiteros_alpha import print_history
-print_history(os.history)
+print_history(arbiter_os.history)
 ```
 
 ## Step-by-Step Explanation
@@ -135,8 +135,8 @@ confidence_router = MetricThresholdPolicyRouter(
     target="generate",
 )
 
-os.add_policy_checker(history_checker)
-os.add_policy_router(confidence_router)
+arbiter_os.add_policy_checker(history_checker)
+arbiter_os.add_policy_router(confidence_router)
 ```
 
 **What's happening:**
@@ -171,7 +171,7 @@ Standard LangGraph state definition. The state flows through all nodes and accum
 #### Generate Instruction
 
 ```python
-@os.instruction("generate")
+@arbiter_os.instruction("generate")
 def generate(state: State) -> dict:
     """Generate a response to the user query."""
     is_retry = bool(state.get("response"))
@@ -275,7 +275,7 @@ for chunk in graph.stream(initial_state, stream_mode="values", debug=False):
 ### Step 6: View History
 
 ```python
-os.history.pprint()
+arbiter_os.history.pprint()
 ```
 
 Displays formatted execution history with all decisions and state changes.

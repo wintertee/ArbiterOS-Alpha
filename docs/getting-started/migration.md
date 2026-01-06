@@ -34,14 +34,14 @@ from arbiteros_alpha import ArbiterOSAlpha
 from arbiteros_alpha.instructions import GENERATE, VERIFY
 
 # ============ Change 2: Create ArbiterOS instance ============
-os = ArbiterOSAlpha()
+arbiter_os = ArbiterOSAlpha()
 
-# ============ Change 3: Add @os.instruction() decorators ============
-@os.instruction(GENERATE)
+# ============ Change 3: Add @arbiter_os.instruction() decorators ============
+@arbiter_os.instruction(GENERATE)
 def generate(state):
     return {"response": "Hello"}
 
-@os.instruction(VERIFY)
+@arbiter_os.instruction(VERIFY)
 def verify(state):
     return state
 
@@ -52,7 +52,7 @@ graph.add_node("verify", verify)
 app = graph.compile()
 
 # Register the compiled graph (required for LangGraph)
-os.register_compiled_graph(app)
+arbiter_os.register_compiled_graph(app)
 ```
 
 **Done.** Your LangGraph code now has:
@@ -112,16 +112,16 @@ from langgraph.graph import StateGraph
 from arbiteros_alpha import ArbiterOSAlpha
 import arbiteros_alpha.instructions as Instr
 
-os = ArbiterOSAlpha(backend="langgraph")
+arbiter_os = ArbiterOSAlpha(backend="langgraph")
 
-@os.instruction(Instr.GENERATE)
+@arbiter_os.instruction(Instr.GENERATE)
 def generate(state):
     return {"response": "Hello"}
 
 builder = StateGraph(dict)
 builder.add_node("generate", generate)
 graph = builder.compile()
-os.register_compiled_graph(graph)
+arbiter_os.register_compiled_graph(graph)
 ```
 
 ---
@@ -134,7 +134,7 @@ After migration, add governance policies:
 from arbiteros_alpha.policy import HistoryPolicyChecker, MetricThresholdPolicyRouter
 
 # Prevent skipping verification
-os.add_policy_checker(
+arbiter_os.add_policy_checker(
     HistoryPolicyChecker(
         name="require_verification",
         bad_sequence=["generate", "execute"]
@@ -142,7 +142,7 @@ os.add_policy_checker(
 )
 
 # Retry on low confidence
-os.add_policy_router(
+arbiter_os.add_policy_router(
     MetricThresholdPolicyRouter(
         name="retry_low_confidence",
         key="confidence",
