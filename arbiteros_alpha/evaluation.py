@@ -128,12 +128,14 @@ class ThresholdEvaluator(NodeEvaluator):
         threshold: Minimum value for the evaluation to pass.
 
     Example:
-        >>> evaluator = ThresholdEvaluator(
-        ...     name="confidence_check",
-        ...     key="confidence",
-        ...     threshold=0.7
-        ... )
-        >>> # Will check if output_state["confidence"] >= 0.7
+        ```python
+        evaluator = ThresholdEvaluator(
+            name="confidence_check",
+            key="confidence",
+            threshold=0.7
+        )
+        # Will check if output_state["confidence"] >= 0.7
+        ```
     """
 
     def __init__(
