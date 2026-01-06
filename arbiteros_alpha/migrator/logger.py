@@ -116,6 +116,21 @@ class MigrationLogger:
                 f"      [green]✓[/green] Compile location: line {compile_line}"
             )
 
+    def detected_langfuse(self, has_langfuse: bool) -> None:
+        """Log Langfuse integration status.
+
+        Args:
+            has_langfuse: True if Langfuse is already present in the code.
+        """
+        if has_langfuse:
+            self.console.print(
+                "      [green]✓[/green] Langfuse integration detected (already present)"
+            )
+        elif self.verbose:
+            self.console.print(
+                "      [dim]Langfuse not detected - will be added for visualization[/dim]"
+            )
+
     def step_classifying(self) -> None:
         """Log the start of classification step."""
         self._current_step = 2

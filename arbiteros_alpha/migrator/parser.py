@@ -48,6 +48,8 @@ class ParsedAgent:
         source_lines: The original source code split into lines.
         imports_end_lineno: Line number where imports section ends.
         has_existing_arbiteros: True if file already has ArbiterOS imports.
+        has_existing_langfuse: True if file already has Langfuse integration.
+        graph_invocation_lines: List of line numbers where graph.stream/invoke are called.
     """
 
     agent_type: Literal["langgraph", "vanilla"]
@@ -58,6 +60,8 @@ class ParsedAgent:
     source_lines: list[str] = field(default_factory=list)
     imports_end_lineno: int = 0
     has_existing_arbiteros: bool = False
+    has_existing_langfuse: bool = False
+    graph_invocation_lines: list[int] = field(default_factory=list)
 
 
 class AgentParser:
@@ -123,6 +127,8 @@ class AgentParser:
         builder_variable: str | None = None
         imports_end_lineno = 0
         has_existing_arbiteros = False
+        has_existing_langfuse = False
+        graph_invocation_lines: list[int] = []
 
         # First pass: detect LangGraph patterns and find node functions
         for node in ast.walk(tree):
@@ -132,6 +138,13 @@ class AgentParser:
                     agent_type = "langgraph"
                 if node.module and "arbiteros_alpha" in node.module:
                     has_existing_arbiteros = True
+                if node.module and "langfuse" in node.module:
+                    has_existing_langfuse = True
+            # Check for regular imports (e.g., import langfuse)
+            if isinstance(node, ast.Import):
+                for alias in node.names:
+                    if "langfuse" in alias.name:
+                        has_existing_langfuse = True
 
             # Check for StateGraph instantiation
             if isinstance(node, ast.Assign):
@@ -151,6 +164,10 @@ class AgentParser:
                 # Check for compile() call
                 if self._is_compile_call(node):
                     compile_lineno = node.lineno
+
+                # Check for graph.stream/invoke calls
+                if self._is_graph_invocation(node):
+                    graph_invocation_lines.append(node.lineno)
 
         # Find compile assignment (graph = builder.compile())
         for node in ast.walk(tree):
@@ -195,6 +212,8 @@ class AgentParser:
             source_lines=self._source_lines,
             imports_end_lineno=imports_end_lineno,
             has_existing_arbiteros=has_existing_arbiteros,
+            has_existing_langfuse=has_existing_langfuse,
+            graph_invocation_lines=graph_invocation_lines,
         )
 
     def _is_state_graph_call(self, node: ast.Call) -> bool:
@@ -215,6 +234,12 @@ class AgentParser:
         """Check if a Call node is a compile() call."""
         if isinstance(node.func, ast.Attribute):
             return node.func.attr == "compile"
+        return False
+
+    def _is_graph_invocation(self, node: ast.Call) -> bool:
+        """Check if a Call node is a graph.stream() or graph.invoke() call."""
+        if isinstance(node.func, ast.Attribute):
+            return node.func.attr in ("stream", "invoke")
         return False
 
     def _extract_node_function_name(self, node: ast.Call) -> str | None:
