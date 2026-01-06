@@ -45,8 +45,8 @@ class WorkerState(TypedDict):
 
 
 # OS
-os = ArbiterOSAlpha(backend="langgraph")
-os.add_policy_checker(
+arbiter_os = ArbiterOSAlpha(backend="langgraph")
+arbiter_os.add_policy_checker(
     HistoryPolicyChecker(
         name="no_direct_synthesizer",
         bad_sequence=[Instr.GENERATE, Instr.RESPOND],
@@ -55,7 +55,7 @@ os.add_policy_checker(
 
 
 # Nodes
-@os.instruction(Instr.DECOMPOSE)
+@arbiter_os.instruction(Instr.DECOMPOSE)
 def orchestrator(state: State):
     """Orchestrator that generates a plan for the report"""
 
@@ -77,7 +77,7 @@ def orchestrator(state: State):
     }
 
 
-@os.instruction(Instr.GENERATE)
+@arbiter_os.instruction(Instr.GENERATE)
 def llm_call(state: WorkerState):
     """Worker writes a section of the report"""
 
@@ -89,7 +89,7 @@ def llm_call(state: WorkerState):
     }
 
 
-@os.instruction(Instr.RESPOND)
+@arbiter_os.instruction(Instr.RESPOND)
 def synthesizer(state: State):
     """Synthesize full report from sections"""
 
@@ -129,9 +129,9 @@ orchestrator_worker_builder.add_edge("synthesizer", END)
 # Compile the workflow
 orchestrator_worker = orchestrator_worker_builder.compile()
 
-os.register_compiled_graph(orchestrator_worker)
+arbiter_os.register_compiled_graph(orchestrator_worker)
 
 # Invoke
 state = orchestrator_worker.invoke({"topic": "Create a report on LLM scaling laws"})
 
-os.history.pprint()
+arbiter_os.history.pprint()
