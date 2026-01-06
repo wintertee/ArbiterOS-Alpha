@@ -42,11 +42,17 @@ class ArbiterOSAlpha:
         policy_routers: List of PolicyRouter instances for dynamic routing.
 
     Example:
-        >>> os = ArbiterOSAlpha(backend="langgraph")
-        >>> os.add_policy_checker(HistoryPolicyChecker("require_verification",["generate", "execute"]))
-        >>> os.add_policy_router(ConfidencePolicyRouter("confidence", 0.5, "retry"))
-        >>> @os.instruction("generate")
-        ... def generate(state): return {"result": "output"}
+        ```python
+        os = ArbiterOSAlpha(backend="langgraph")
+        os.add_policy_checker(
+            HistoryPolicyChecker("require_verification", ["generate", "execute"])
+        )
+        os.add_policy_router(ConfidencePolicyRouter("confidence", 0.5, "retry"))
+
+        @os.instruction("generate")
+        def generate(state):
+            return {"result": "output"}
+        ```
     """
 
     def __init__(self, backend: Literal["langgraph", "vanilla"] = "langgraph"):
@@ -224,11 +230,14 @@ class ArbiterOSAlpha:
             A decorator function that wraps the target node function.
 
         Example:
-            >>> from arbiteros_alpha.instructions import CognitiveCore
-            >>> @os.instruction(CognitiveCore.GENERATE)
-            ... def generate(state: State) -> State:
-            ...     return {"field": "value"}
-            >>> # Function now includes policy checks and history tracking
+            ```python
+            from arbiteros_alpha.instructions import CognitiveCore
+
+            @os.instruction(CognitiveCore.GENERATE)
+            def generate(state: State) -> State:
+                return {"field": "value"}
+            # Function now includes policy checks and history tracking
+            ```
         """
         # Validate that instruction_type is a valid InstructionType enum
         if not isinstance(instruction_type, InstructionType.__args__):

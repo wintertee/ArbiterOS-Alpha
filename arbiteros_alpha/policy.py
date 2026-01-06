@@ -60,12 +60,15 @@ class HistoryPolicyChecker(PolicyChecker):
     by maintaining a blacklist of forbidden instruction chains.
 
     Example:
-        >>> from arbiteros_alpha.instructions import CognitiveCore, ExecutionCore
-        >>> checker = HistoryPolicyChecker(
-        ...     "no_direct_toolcall",
-        ...     [CognitiveCore.GENERATE, ExecutionCore.TOOL_CALL]
-        ... )
-        >>> # This will raise RuntimeError if GENERATE is followed by TOOL_CALL
+        ```python
+        from arbiteros_alpha.instructions import CognitiveCore, ExecutionCore
+
+        checker = HistoryPolicyChecker(
+            "no_direct_toolcall",
+            [CognitiveCore.GENERATE, ExecutionCore.TOOL_CALL]
+        )
+        # This will raise RuntimeError if GENERATE is followed by TOOL_CALL
+        ```
     """
 
     name: str
@@ -147,13 +150,15 @@ class MetricThresholdPolicyRouter(PolicyRouter):
     Example:
         Create a router that triggers regeneration when confidence is low:
 
-        >>> router = MetricThresholdPolicyRouter(
-        ...     name="regenerate_on_low_confidence",
-        ...     key="confidence",
-        ...     threshold=0.6,
-        ...     target="generate"
-        ... )
-        >>> # If output["confidence"] < 0.6, routes back to "generate" node
+        ```python
+        router = MetricThresholdPolicyRouter(
+            name="regenerate_on_low_confidence",
+            key="confidence",
+            threshold=0.6,
+            target="generate"
+        )
+        # If output["confidence"] < 0.6, routes back to "generate" node
+        ```
     """
 
     name: str
