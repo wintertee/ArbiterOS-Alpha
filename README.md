@@ -15,7 +15,8 @@ uv run -m examples.langgraph
 
 - 🔒 **Policy-Driven Execution**: Validate execution constraints before and after instruction execution
 - 🔀 **Dynamic Routing**: Route execution flow based on policy conditions
-- 📊 **Execution History**: Track all instruction executions with timestamps and I/O
+- 📊 **Evaluation & Feedback**: Assess node quality with non-blocking evaluators (RL-style rewards)
+- 📈 **Execution History**: Track all instruction executions with timestamps and I/O
 - 🎯 **LangGraph-Native**: Minimal migration cost from existing LangGraph code
 - 🧩 **Decorator-Based**: Use `@instruction` decorator for lightweight governance
 - 🔓 **Zero Lock-In**: Remove ArbiterOS by removing decorators and policies
@@ -58,6 +59,14 @@ uv run mkdocs build
 # Serve documentation locally
 uv run mkdocs serve
 ```
+
+Visit http://127.0.0.1:8000 to view the documentation.
+
+**Documentation includes:**
+- 📖 [Getting Started](docs/getting-started/installation.md) - Installation and quickstart
+- 🧠 [Concepts](docs/concepts/policies.md) - Policy architecture and evaluators
+- 📚 [Examples](docs/examples/complete-tutorial.md) - Complete tutorials
+- 🔧 [API Reference](docs/api/core.md) - Auto-generated API docs
 
 See [AGENTS.md](AGENTS.md) for AI development guidelines.
 
