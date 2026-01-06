@@ -17,7 +17,7 @@ logging.basicConfig(
 
 # 1. Setup OS
 
-os = ArbiterOSAlpha(backend="vanilla")
+arbiter_os = ArbiterOSAlpha(backend="vanilla")
 
 # Policy: Prevent direct generate->toolcall without proper flow
 history_checker = HistoryPolicyChecker(
@@ -27,7 +27,7 @@ history_checker = HistoryPolicyChecker(
 
 
 # if you add this checker, intended error will be raised
-os.add_policy_checker(history_checker)
+arbiter_os.add_policy_checker(history_checker)
 
 # 2. basic modules
 
@@ -41,7 +41,7 @@ class State(TypedDict):
     confidence: float
 
 
-@os.instruction(Instr.GENERATE)
+@arbiter_os.instruction(Instr.GENERATE)
 def generate(state: State) -> State:
     """Generate a response to the user query."""
 
@@ -58,13 +58,13 @@ def generate(state: State) -> State:
     return {"response": response}
 
 
-@os.instruction(Instr.TOOL_CALL)
+@arbiter_os.instruction(Instr.TOOL_CALL)
 def tool_call(state: State) -> State:
     """Call external tools to enhance the response."""
     return {"tool_result": "ok"}
 
 
-@os.instruction(Instr.EVALUATE_PROGRESS)
+@arbiter_os.instruction(Instr.EVALUATE_PROGRESS)
 def evaluate(state: State) -> State:
     """Evaluate confidence in the response quality."""
     # Heuristic: response quality based on length
@@ -95,4 +95,4 @@ def main():
 
 if __name__ == "__main__":
     main()
-    os.history.pprint()
+    arbiter_os.history.pprint()

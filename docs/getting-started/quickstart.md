@@ -30,10 +30,10 @@ from arbiteros_alpha.policy import HistoryPolicyChecker, MetricThresholdPolicyRo
 from arbiteros_alpha.instructions import GENERATE, EVALUATE
 
 # Create instance
-os = ArbiterOSAlpha()
+arbiter_os = ArbiterOSAlpha()
 
 # Add policy checker to prevent direct toolcall after generate
-os.add_policy_checker(
+arbiter_os.add_policy_checker(
     HistoryPolicyChecker(
         name="no_direct_toolcall",
         bad_sequence=[GENERATE, TOOL_CALL]
@@ -41,7 +41,7 @@ os.add_policy_checker(
 )
 
 # Add policy router to regenerate when confidence is low
-os.add_policy_router(
+arbiter_os.add_policy_router(
     MetricThresholdPolicyRouter(
         name="regenerate_on_low_confidence",
         key="confidence",
@@ -54,13 +54,13 @@ os.add_policy_router(
 ### 3. Define and Decorate Functions
 
 ```python
-@os.instruction(GENERATE)
+@arbiter_os.instruction(GENERATE)
 def generate(state: State) -> dict:
     """Generate AI response."""
     response = "AI generated response"
     return {"response": response}
 
-@os.instruction(EVALUATE)
+@arbiter_os.instruction(EVALUATE)
 def evaluate(state: State) -> dict:
     """Evaluate response quality."""
     confidence = 0.8  # Calculate confidence
@@ -89,7 +89,7 @@ app = graph.compile()
 result = app.invoke({"query": "What is AI?", "response": "", "confidence": 0.0})
 
 # Print execution history
-os.history.pprint()
+arbiter_os.history.pprint()
 ```
 
 ## Understanding the Output
