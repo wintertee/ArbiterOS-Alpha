@@ -17,6 +17,7 @@ from langgraph.types import Command
 from .history import History, HistoryItem
 from .instructions import InstructionType
 from .policy import PolicyChecker, PolicyRouter
+from .evaluation import EvaluationResult, NodeEvaluator
 
 logger = logging.getLogger(__name__)
 
@@ -41,11 +42,17 @@ class ArbiterOSAlpha:
         policy_routers: List of PolicyRouter instances for dynamic routing.
 
     Example:
-        >>> os = ArbiterOSAlpha(backend="langgraph")
-        >>> os.add_policy_checker(HistoryPolicyChecker("require_verification",["generate", "execute"]))
-        >>> os.add_policy_router(ConfidencePolicyRouter("confidence", 0.5, "retry"))
-        >>> @os.instruction("generate")
-        ... def generate(state): return {"result": "output"}
+        ```python
+        os = ArbiterOSAlpha(backend="langgraph")
+        os.add_policy_checker(
+            HistoryPolicyChecker("require_verification", ["generate", "execute"])
+        )
+        os.add_policy_router(ConfidencePolicyRouter("confidence", 0.5, "retry"))
+
+        @os.instruction("generate")
+        def generate(state):
+            return {"result": "output"}
+        ```
     """
 
     def __init__(self, backend: Literal["langgraph", "vanilla"] = "langgraph"):
@@ -60,6 +67,7 @@ class ArbiterOSAlpha:
         self.history: History = History()
         self.policy_checkers: list[PolicyChecker] = []
         self.policy_routers: list[PolicyRouter] = []
+        self.evaluators: list[NodeEvaluator] = []
 
         if self.backend == "langgraph":
             self._patch_pregel_loop()
@@ -90,6 +98,19 @@ class ArbiterOSAlpha:
             )
         logger.debug(f"Adding policy router: {router}")
         self.policy_routers.append(router)
+
+    def add_evaluator(self, evaluator: NodeEvaluator) -> None:
+        """Register a node evaluator for quality assessment.
+
+        Evaluators assess node execution quality after completion. Unlike
+        policy checkers, they do not block execution but provide feedback
+        and scores for monitoring, RL training, or self-improvement.
+
+        Args:
+            evaluator: A NodeEvaluator instance to assess execution quality.
+        """
+        logger.debug(f"Adding evaluator: {evaluator}")
+        self.evaluators.append(evaluator)
 
     def _check_before(self) -> tuple[dict[str, bool], bool]:
         """Execute all policy checkers before instruction execution.
@@ -141,6 +162,56 @@ class ArbiterOSAlpha:
             logger.warning(f"Router {used_router} decision made to: {destination}")
         return results, destination
 
+    def _evaluate_node(self) -> dict[str, EvaluationResult]:
+        """Execute all evaluators on the most recent node.
+
+        Evaluators assess the quality of the node execution that just completed.
+        The node's HistoryItem (including output_state) has already been added
+        to history and can be accessed via `history.entries[-1][-1]`.
+
+        Only evaluators whose target_instructions match the current node's
+        instruction type will be executed. If target_instructions is None,
+        the evaluator runs on all nodes.
+
+        Returns:
+            A dictionary mapping evaluator names to their evaluation results.
+
+        Note:
+            Evaluator failures are logged but do not raise exceptions or
+            interrupt execution. This ensures evaluation does not break
+            the workflow.
+        """
+        results = {}
+        current_item = self.history.entries[-1][-1]
+        current_instruction = current_item.instruction
+
+        logger.debug(f"Running evaluators for instruction: {current_instruction.name}")
+
+        for evaluator in self.evaluators:
+            # Check if this evaluator should run for this instruction type
+            if evaluator.target_instructions is not None:
+                if current_instruction not in evaluator.target_instructions:
+                    logger.debug(
+                        f"Skipping evaluator {evaluator.name} "
+                        f"(not targeting {current_instruction.name})"
+                    )
+                    continue
+
+            try:
+                result = evaluator.evaluate(self.history)
+                results[evaluator.name] = result
+                logger.info(
+                    f"Evaluator {evaluator.name}: score={result.score:.2f}, "
+                    f"passed={result.passed}, feedback={result.feedback}"
+                )
+            except Exception as e:
+                logger.error(
+                    f"Evaluator {evaluator.name} failed with error: {e}",
+                    exc_info=True,
+                )
+                # Evaluation failures should not interrupt execution
+        return results
+
     def instruction(
         self, instruction_type: InstructionType
     ) -> Callable[[Callable], Callable]:
@@ -159,11 +230,14 @@ class ArbiterOSAlpha:
             A decorator function that wraps the target node function.
 
         Example:
-            >>> from arbiteros_alpha.instructions import CognitiveCore
-            >>> @os.instruction(CognitiveCore.GENERATE)
-            ... def generate(state: State) -> State:
-            ...     return {"field": "value"}
-            >>> # Function now includes policy checks and history tracking
+            ```python
+            from arbiteros_alpha.instructions import CognitiveCore
+
+            @os.instruction(CognitiveCore.GENERATE)
+            def generate(state: State) -> State:
+                return {"field": "value"}
+            # Function now includes policy checks and history tracking
+            ```
         """
         # Validate that instruction_type is a valid InstructionType enum
         if not isinstance(instruction_type, InstructionType.__args__):
@@ -194,6 +268,10 @@ class ArbiterOSAlpha:
                 result = func(*args, **kwargs)
                 logger.debug(f"Instruction {instruction_type.name} returned: {result}")
                 history_item.output_state = result
+
+                # Evaluate node execution quality
+                if self.evaluators:
+                    history_item.evaluation_results = self._evaluate_node()
 
                 history_item.route_policy_results, destination = self._route_after()
 

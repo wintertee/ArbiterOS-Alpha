@@ -1,9 +1,12 @@
 import datetime
 import logging
 from dataclasses import dataclass, field
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from .instructions import InstructionType
+
+if TYPE_CHECKING:
+    from .evaluation import EvaluationResult
 
 logger = logging.getLogger(__name__)
 
@@ -19,6 +22,7 @@ class HistoryItem:
         output_state: The state returned by the instruction.
         check_policy_results: Results of policy checkers (name -> passed/failed).
         route_policy_results: Results of policy routers (name -> target or None).
+        evaluation_results: Results of node evaluators (name -> EvaluationResult).
     """
 
     timestamp: datetime.datetime
@@ -27,6 +31,7 @@ class HistoryItem:
     output_state: dict[str, Any] = field(default_factory=dict)
     check_policy_results: dict[str, bool] = field(default_factory=dict)
     route_policy_results: dict[str, str | None] = field(default_factory=dict)
+    evaluation_results: dict[str, "EvaluationResult"] = field(default_factory=dict)
 
 
 SuperStep = list[HistoryItem]
@@ -114,6 +119,21 @@ class History:
                             )
                         else:
                             console.print(f"      [dim]— {policy_name}[/dim]")
+                else:
+                    console.print("      [dim](none)[/dim]")
+
+                # Show evaluation results
+                console.print("    [yellow]Evaluations:[/yellow]")
+                eval_results = entry.evaluation_results
+                if eval_results:
+                    for eval_name, eval_result in eval_results.items():
+                        status = (
+                            "[green]✓[/green]" if eval_result.passed else "[red]✗[/red]"
+                        )
+                        console.print(
+                            f"      {status} {eval_name}: "
+                            f"[cyan]score={eval_result.score:.2f}[/cyan] - {eval_result.feedback}"
+                        )
                 else:
                     console.print("      [dim](none)[/dim]")
 

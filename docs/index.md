@@ -8,7 +8,8 @@ ArbiterOS-alpha is a lightweight governance framework that wraps LangGraph, enab
 
 - 🔒 **Policy-Driven Execution**: Validate execution constraints before and after instruction execution
 - 🔀 **Dynamic Routing**: Route execution flow based on policy conditions
-- 📊 **Execution History**: Track all instruction executions with timestamps and I/O
+- 📊 **Evaluation & Feedback**: Assess node quality with non-blocking evaluators (RL-style rewards)
+- 📈 **Execution History**: Track all instruction executions with timestamps and I/O
 - 🎯 **LangGraph-Native**: Minimal migration cost from existing LangGraph code
 - 🧩 **Decorator-Based**: Use `@instruction` decorator for lightweight governance
 - 🔓 **Zero Lock-In**: Remove ArbiterOS by removing decorators and policies
@@ -16,13 +17,14 @@ ArbiterOS-alpha is a lightweight governance framework that wraps LangGraph, enab
 ## Quick Example
 
 ```python
-from arbiteros_alpha import ArbiterOSAlpha
+from arbiteros_alpha import ArbiterOSAlpha, ThresholdEvaluator
 from arbiteros_alpha.policy import HistoryPolicyChecker, MetricThresholdPolicyRouter
+from arbiteros_alpha.instructions import CognitiveCore
 
 # Create ArbiterOS instance
 os = ArbiterOSAlpha()
 
-# Add policies
+# Add policy checker (pre-execution validation)
 os.add_policy_checker(
     HistoryPolicyChecker(
         name="no_direct_toolcall",
@@ -30,6 +32,7 @@ os.add_policy_checker(
     )
 )
 
+# Add policy router (post-execution routing)
 os.add_policy_router(
     MetricThresholdPolicyRouter(
         name="regenerate_on_low_confidence",
@@ -39,12 +42,22 @@ os.add_policy_router(
     )
 )
 
-# Decorate your functions
-@os.instruction("generate")
-def generate(state):
-    return {"response": "AI response"}
+# Add evaluator (quality assessment)
+os.add_evaluator(
+    ThresholdEvaluator(
+        name="confidence_check",
+        key="confidence",
+        threshold=0.7,
+        target_instructions=[CognitiveCore.GENERATE]
+    )
+)
 
-@os.instruction("evaluate")
+# Decorate your functions
+@os.instruction(CognitiveCore.GENERATE)
+def generate(state):
+    return {"response": "AI response", "confidence": 0.85}
+
+@os.instruction(CognitiveCore.EVALUATE)
 def evaluate(state):
     return {"confidence": 0.8}
 ```
@@ -66,7 +79,8 @@ def evaluate(state):
 
 ## Core Concepts
 
-- [Policy Architecture](concepts/policies.md)
+- [Policy Architecture](concepts/policies.md) - PolicyChecker (pre-execution) and PolicyRouter (post-execution)
+- [Evaluators](concepts/evaluators.md) - Quality assessment and RL-style reward signals
 
 ## Documentation Structure
 
