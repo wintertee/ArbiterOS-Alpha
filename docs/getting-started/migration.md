@@ -77,7 +77,7 @@ uv run -m arbiteros_alpha.migrator path/to/agent.py
 
 1. Parses your file (detects LangGraph or vanilla)
 2. Classifies each function using LLM (e.g., `generate` → `GENERATE`)
-3. Adds imports, decorators, and OS initialization
+3. Adds imports, decorators, OS initialization and langfuse visualization
 4. Creates a backup
 
 **Options:**

@@ -4,10 +4,12 @@ This module provides automatic classification of function nodes into
 ArbiterOS instruction types using LLM inference with structured output.
 """
 
+import json
 import os
+import re
 from dataclasses import dataclass
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
 
 from .parser import ParsedFunction
 
@@ -170,17 +172,29 @@ class InstructionClassifier:
 
         Returns:
             NodeClassification with the predicted type and confidence.
+
+        Raises:
+            ValueError: If classification fails and JSON parsing also fails.
         """
         llm = self._get_llm()
 
         # Build the prompt
         prompt = self._build_classification_prompt(function)
 
-        # Use structured output
-        structured_llm = llm.with_structured_output(NodeClassification)
-
-        result = structured_llm.invoke(prompt)
-        return result
+        # Try structured output first (works for GPT models)
+        try:
+            structured_llm = llm.with_structured_output(NodeClassification)
+            result = structured_llm.invoke(prompt)
+            return result
+        except Exception as e:
+            # Check if error is related to response_format (e.g., DeepSeek doesn't support it)
+            error_str = str(e).lower()
+            if "response_format" in error_str or "unavailable" in error_str:
+                # Fall back to manual JSON parsing
+                return self._classify_with_json_parsing(function)
+            else:
+                # Re-raise other errors
+                raise
 
     def classify_batch(
         self, functions: list[ParsedFunction]
@@ -194,6 +208,90 @@ class InstructionClassifier:
             List of classifications in the same order as input.
         """
         return [self.classify(func) for func in functions]
+
+    def _classify_with_json_parsing(
+        self, function: ParsedFunction
+    ) -> NodeClassification:
+        """Classify using regular LLM invocation with manual JSON parsing.
+
+        This method is used as a fallback when structured output is not
+        supported by the API (e.g., DeepSeek).
+
+        Args:
+            function: The parsed function to classify.
+
+        Returns:
+            NodeClassification with the predicted type and confidence.
+
+        Raises:
+            ValueError: If JSON parsing fails or validation fails.
+        """
+        llm = self._get_llm()
+
+        # Add JSON format instructions to prompt
+        json_prompt = self._build_classification_prompt(
+            function, include_json_format=True
+        )
+
+        # Use regular invocation (no structured output)
+        response = llm.invoke(json_prompt)
+
+        # Extract content from response
+        content = response.content if hasattr(response, "content") else str(response)
+
+        # Parse JSON from response
+        json_data = self._parse_json_from_response(content)
+
+        # Validate and create NodeClassification
+        try:
+            result = NodeClassification(**json_data)
+            return result
+        except ValidationError as e:
+            raise ValueError(
+                f"Failed to validate classification result: {e}\n"
+                f"Parsed JSON: {json_data}\n"
+                f"Response content: {content}"
+            )
+
+    def _parse_json_from_response(self, content: str) -> dict:
+        """Extract and parse JSON from LLM response.
+
+        Handles cases where JSON is wrapped in markdown code blocks.
+
+        Args:
+            content: The response content from the LLM.
+
+        Returns:
+            Parsed JSON as a dictionary.
+
+        Raises:
+            ValueError: If no valid JSON is found in the response.
+        """
+        # Try to find JSON in markdown code blocks first
+        json_block_pattern = r"```(?:json)?\s*(\{.*?\})\s*```"
+        json_match = re.search(json_block_pattern, content, re.DOTALL)
+
+        if json_match:
+            json_str = json_match.group(1)
+        else:
+            # Try to find JSON object directly
+            json_pattern = r"\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}"
+            json_match = re.search(json_pattern, content, re.DOTALL)
+            if json_match:
+                json_str = json_match.group(0)
+            else:
+                raise ValueError(
+                    f"No JSON found in LLM response.\nResponse content: {content}"
+                )
+
+        try:
+            return json.loads(json_str)
+        except json.JSONDecodeError as e:
+            raise ValueError(
+                f"Failed to parse JSON from LLM response: {e}\n"
+                f"JSON string: {json_str}\n"
+                f"Full response: {content}"
+            )
 
     def classify_manual(
         self, function: ParsedFunction, instruction_type: str
@@ -215,11 +313,15 @@ class InstructionClassifier:
             reasoning="Manually selected by user",
         )
 
-    def _build_classification_prompt(self, function: ParsedFunction) -> str:
+    def _build_classification_prompt(
+        self, function: ParsedFunction, include_json_format: bool = False
+    ) -> str:
         """Build the classification prompt for a function.
 
         Args:
             function: The parsed function to classify.
+            include_json_format: If True, include JSON format instructions
+                for APIs that don't support structured output.
 
         Returns:
             The prompt string for the LLM.
@@ -263,8 +365,32 @@ Provide your classification with:
 - The instruction_type (e.g., "GENERATE", "VERIFY", "TOOL_CALL")
 - The core it belongs to (e.g., "CognitiveCore", "NormativeCore")
 - A confidence score (0.0 to 1.0)
-- Brief reasoning for your choice
+- Brief reasoning for your choice"""
+
+        # Add JSON format instructions if needed
+        if include_json_format:
+            prompt += """
+
+## Output Format
+
+Please respond with a valid JSON object matching this exact structure:
+```json
+{{
+    "instruction_type": "GENERATE",
+    "core": "CognitiveCore",
+    "confidence": 0.95,
+    "reasoning": "Brief explanation here"
+}}
+```
+
+Important:
+- Return ONLY valid JSON, no additional text
+- instruction_type must be one of the types listed above
+- core must match the core for that instruction type
+- confidence must be a float between 0.0 and 1.0
+- reasoning should be a brief explanation
 """
+
         return prompt
 
     @staticmethod
