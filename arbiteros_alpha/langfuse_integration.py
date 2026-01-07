@@ -55,7 +55,7 @@ class ArbiterLangfuseHandler:
         """
         self.arbiter_os = arbiter_os
         self.use_event = use_event
-        
+
         # Initialize Langfuse client directly
         langfuse_kwargs: dict[str, Any] = {
             "public_key": public_key,
@@ -63,24 +63,30 @@ class ArbiterLangfuseHandler:
         }
         if host is not None:
             langfuse_kwargs["host"] = host
-        
+
         # Add common Langfuse client parameters from kwargs
-        langfuse_params = ["base_url", "timeout", "debug", "tracing_enabled", 
-                          "flush_at", "flush_interval", "environment", "release"]
+        langfuse_params = [
+            "base_url",
+            "timeout",
+            "debug",
+            "tracing_enabled",
+            "flush_at",
+            "flush_interval",
+            "environment",
+            "release",
+        ]
         for param in langfuse_params:
             if param in kwargs:
                 langfuse_kwargs[param] = kwargs[param]
-        
+
         self.langfuse = Langfuse(**langfuse_kwargs)
-        
+
         # Keep CallbackHandler for LangChain callback compatibility
         # Pass all kwargs to CallbackHandler (it will use what it needs)
         if handler is not None:
             self.handler = handler
         else:
-            self.handler = CallbackHandler(
-                public_key=public_key, **kwargs
-            )
+            self.handler = CallbackHandler(public_key=public_key, **kwargs)
 
     def _get_most_recent_history_item(self) -> Optional[HistoryItem]:
         """Get the most recent HistoryItem from the execution history.
