@@ -6,6 +6,7 @@ policy-based validation and dynamic routing, with time-travel checkpoint support
 
 from .core import ArbiterOSAlpha
 from .history import History, HistoryItem
+from .langfuse_integration import ArbiterLangfuseHandler
 from .policy import (
     HistoryPolicyChecker,
     MetricThresholdPolicyRouter,
@@ -19,6 +20,8 @@ __all__ = [
     # History
     "History",
     "HistoryItem",
+    # Langfuse Integration
+    "ArbiterLangfuseHandler",
     # Policy
     "PolicyChecker",
     "PolicyRouter",

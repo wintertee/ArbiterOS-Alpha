@@ -59,7 +59,7 @@ class CodeGenerator:
         "import arbiteros_alpha.instructions as Instr",
     ]
     LANGFUSE_IMPORTS = [
-        "from langfuse.langchain import CallbackHandler",
+        "from arbiteros_alpha import ArbiterLangfuseHandler",
     ]
 
     def __init__(self) -> None:
@@ -187,7 +187,7 @@ class CodeGenerator:
 
                     langfuse_lines = [
                         "",
-                        "langfuse_handler = CallbackHandler()",
+                        "langfuse_handler = ArbiterLangfuseHandler(arbiter_os)",
                         "",
                     ]
                     for i, line in enumerate(langfuse_lines):

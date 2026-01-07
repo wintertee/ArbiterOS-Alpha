@@ -134,17 +134,13 @@ class AgentParser:
         for node in ast.walk(tree):
             # Check for LangGraph imports
             if isinstance(node, ast.ImportFrom):
+                for n in node.names:
+                    if n.name == "ArbiterLangfuseHandler":
+                        has_existing_langfuse = True
                 if node.module and "langgraph" in node.module:
                     agent_type = "langgraph"
                 if node.module and "arbiteros_alpha" in node.module:
                     has_existing_arbiteros = True
-                if node.module and "langfuse" in node.module:
-                    has_existing_langfuse = True
-            # Check for regular imports (e.g., import langfuse)
-            if isinstance(node, ast.Import):
-                for alias in node.names:
-                    if "langfuse" in alias.name:
-                        has_existing_langfuse = True
 
             # Check for StateGraph instantiation
             if isinstance(node, ast.Assign):
