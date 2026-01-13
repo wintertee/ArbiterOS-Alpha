@@ -1,0 +1,4 @@
+# add submodule for ArbiterOS-Alpha https://github.com/ChangranXU/TradingAgents to examples/TradingAgents
+[submodule "examples/TradingAgents/arbiteros-alpha"]
+	path = examples/TradingAgents/arbiteros-alpha
+	url = https://github.com/ChangranXU/ArbiterOS-Alpha.git
