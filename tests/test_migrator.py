@@ -112,6 +112,73 @@ def verify(state):
 """
 
 
+@pytest.fixture
+def sample_async_langgraph_source():
+    """Provide sample LangGraph agent with async functions (plan-and-execute style)."""
+    return """from langgraph.graph import StateGraph, END, START
+from typing import TypedDict, List
+
+class PlanExecute(TypedDict):
+    input: str
+    plan: List[str]
+    response: str
+
+async def execute_step(state: PlanExecute):
+    \"\"\"Execute the current step of the plan.\"\"\"
+    return {"response": "step executed"}
+
+async def plan_step(state: PlanExecute):
+    \"\"\"Create a plan based on the input.\"\"\"
+    return {"plan": ["step1", "step2"]}
+
+async def replan_step(state: PlanExecute):
+    \"\"\"Replan based on execution results.\"\"\"
+    return {"plan": ["revised_step"]}
+
+def should_end(state: PlanExecute):
+    \"\"\"Determine if execution should end.\"\"\"
+    if state.get("response"):
+        return END
+    return "agent"
+
+workflow = StateGraph(PlanExecute)
+workflow.add_node("planner", plan_step)
+workflow.add_node("agent", execute_step)
+workflow.add_node("replan", replan_step)
+workflow.add_edge(START, "planner")
+workflow.add_edge("planner", "agent")
+workflow.add_edge("agent", "replan")
+
+app = workflow.compile()
+"""
+
+
+@pytest.fixture
+def sample_mixed_sync_async_source():
+    """Provide source with both sync and async functions."""
+    return """from langgraph.graph import StateGraph, END
+from typing import TypedDict
+
+class State(TypedDict):
+    query: str
+    response: str
+
+async def async_generate(state: State):
+    \"\"\"Async generate function.\"\"\"
+    return {"response": "async hello"}
+
+def sync_verify(state: State):
+    \"\"\"Sync verify function.\"\"\"
+    return state
+
+builder = StateGraph(State)
+builder.add_node("generate", async_generate)
+builder.add_node("verify", sync_verify)
+
+graph = builder.compile()
+"""
+
+
 # ============================================================================
 # Test AgentParser
 # ============================================================================
@@ -203,6 +270,69 @@ class TestAgentParser:
 
         assert result.agent_type == "vanilla"
         assert len(result.functions) == 0
+
+    def test_parse_source_detects_async_functions(self, sample_async_langgraph_source):
+        """Test that async functions are correctly detected and marked."""
+        parser = AgentParser()
+        result = parser.parse_source(sample_async_langgraph_source)
+
+        assert result.agent_type == "langgraph"
+        assert len(result.functions) == 4  # 3 async + 1 sync (should_end)
+
+        func_names = {f.name for f in result.functions}
+        assert "execute_step" in func_names
+        assert "plan_step" in func_names
+        assert "replan_step" in func_names
+        assert "should_end" in func_names
+
+        # Check async flags
+        execute_func = next(f for f in result.functions if f.name == "execute_step")
+        assert execute_func.is_async is True
+        assert execute_func.has_state_param is True
+        assert execute_func.docstring == "Execute the current step of the plan."
+
+        plan_func = next(f for f in result.functions if f.name == "plan_step")
+        assert plan_func.is_async is True
+
+        should_end_func = next(f for f in result.functions if f.name == "should_end")
+        assert should_end_func.is_async is False
+
+    def test_parse_source_handles_mixed_sync_async(self, sample_mixed_sync_async_source):
+        """Test that both sync and async functions are extracted correctly."""
+        parser = AgentParser()
+        result = parser.parse_source(sample_mixed_sync_async_source)
+
+        assert result.agent_type == "langgraph"
+        assert len(result.functions) == 2
+
+        async_func = next(f for f in result.functions if f.name == "async_generate")
+        sync_func = next(f for f in result.functions if f.name == "sync_verify")
+
+        assert async_func.is_async is True
+        assert async_func.is_node_function is True
+        assert async_func.docstring == "Async generate function."
+
+        assert sync_func.is_async is False
+        assert sync_func.is_node_function is True
+        assert sync_func.docstring == "Sync verify function."
+
+    def test_parse_source_async_node_functions_detected(
+        self, sample_async_langgraph_source
+    ):
+        """Test that async functions used in add_node are marked as node functions."""
+        parser = AgentParser()
+        result = parser.parse_source(sample_async_langgraph_source)
+
+        # plan_step, execute_step, replan_step are used in add_node
+        plan_func = next(f for f in result.functions if f.name == "plan_step")
+        execute_func = next(f for f in result.functions if f.name == "execute_step")
+        replan_func = next(f for f in result.functions if f.name == "replan_step")
+        should_end_func = next(f for f in result.functions if f.name == "should_end")
+
+        assert plan_func.is_node_function is True
+        assert execute_func.is_node_function is True
+        assert replan_func.is_node_function is True
+        assert should_end_func.is_node_function is False  # Not used in add_node
 
 
 # ============================================================================
