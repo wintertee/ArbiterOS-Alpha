@@ -221,6 +221,8 @@ class ArbiterOSAlpha:
         and dynamic routing to LangGraph node functions. It's the core
         integration point between ArbiterOS and LangGraph.
 
+        Supports both sync and async functions.
+
         Args:
             instruction_type: An instruction type from one of the Core enums
                 (CognitiveCore, MemoryCore, ExecutionCore, NormativeCore,
@@ -230,13 +232,17 @@ class ArbiterOSAlpha:
             A decorator function that wraps the target node function.
 
         Example:
-            ```python
+          ```python
             from arbiteros_alpha.instructions import CognitiveCore
-
             @os.instruction(CognitiveCore.GENERATE)
             def generate(state: State) -> State:
                 return {"field": "value"}
             # Function now includes policy checks and history tracking
+
+            @os.instruction(CognitiveCore.GENERATE)
+            async def async_generate(state: State) -> State:
+                return {"field": "value"}
+            # Async functions are also supported
             ```
         """
         # Validate that instruction_type is a valid InstructionType enum
@@ -246,41 +252,87 @@ class ArbiterOSAlpha:
             )
 
         def decorator(func: Callable) -> Callable:
-            @functools.wraps(func)
-            def wrapper(*args, **kwargs) -> Any:
-                logger.debug(
-                    f"Executing instruction: {instruction_type.__class__.__name__}.{instruction_type.name}"
-                )
+            # Check if the function is async
+            is_async = inspect.iscoroutinefunction(func)
 
-                history_item = HistoryItem(
-                    timestamp=datetime.datetime.now(),
-                    instruction=instruction_type,
-                    input_state=args[0],
-                )
+            if is_async:
 
-                if self.backend == "vanilla":
-                    self.history.enter_next_superstep([instruction_type.name])
+                @functools.wraps(func)
+                async def async_wrapper(*args, **kwargs) -> Any:
+                    logger.debug(
+                        f"Executing async instruction: {instruction_type.__class__.__name__}.{instruction_type.name}"
+                    )
 
-                self.history.add_entry(history_item)
+                    history_item = HistoryItem(
+                        timestamp=datetime.datetime.now(),
+                        instruction=instruction_type,
+                        input_state=args[0],
+                    )
 
-                history_item.check_policy_results, all_passed = self._check_before()
+                    if self.backend == "vanilla":
+                        self.history.enter_next_superstep([instruction_type.name])
 
-                result = func(*args, **kwargs)
-                logger.debug(f"Instruction {instruction_type.name} returned: {result}")
-                history_item.output_state = result
+                    self.history.add_entry(history_item)
 
-                # Evaluate node execution quality
-                if self.evaluators:
-                    history_item.evaluation_results = self._evaluate_node()
+                    history_item.check_policy_results, all_passed = self._check_before()
 
-                history_item.route_policy_results, destination = self._route_after()
+                    result = await func(*args, **kwargs)
+                    logger.debug(
+                        f"Instruction {instruction_type.name} returned: {result}"
+                    )
+                    history_item.output_state = result
 
-                if destination:
-                    return Command(update=result, goto=destination)
+                    history_item.route_policy_results, destination = self._route_after()
 
-                return result
+                    # Evaluate node execution quality
+                    if self.evaluators:
+                        history_item.evaluation_results = self._evaluate_node()
 
-            return wrapper
+                    if destination:
+                        return Command(update=result, goto=destination)
+
+                    return result
+
+                return async_wrapper
+            else:
+
+                @functools.wraps(func)
+                def wrapper(*args, **kwargs) -> Any:
+                    logger.debug(
+                        f"Executing instruction: {instruction_type.__class__.__name__}.{instruction_type.name}"
+                    )
+
+                    history_item = HistoryItem(
+                        timestamp=datetime.datetime.now(),
+                        instruction=instruction_type,
+                        input_state=args[0],
+                    )
+
+                    if self.backend == "vanilla":
+                        self.history.enter_next_superstep([instruction_type.name])
+
+                    self.history.add_entry(history_item)
+
+                    history_item.check_policy_results, all_passed = self._check_before()
+
+                    result = func(*args, **kwargs)
+                    logger.debug(
+                        f"Instruction {instruction_type.name} returned: {result}"
+                    )
+                    history_item.output_state = result
+
+                    history_item.route_policy_results, destination = self._route_after()
+
+                    # Evaluate node execution quality
+                    if self.evaluators:
+                        history_item.evaluation_results = self._evaluate_node()
+
+                    if destination:
+                        return Command(update=result, goto=destination)
+
+                    return result
+
+                return wrapper
 
         return decorator
 
