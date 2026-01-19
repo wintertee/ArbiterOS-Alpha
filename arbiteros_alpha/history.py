@@ -28,7 +28,7 @@ class HistoryItem:
     timestamp: datetime.datetime
     instruction: InstructionType
     input_state: dict[str, Any]
-    output_state: dict[str, Any] = field(default_factory=dict)
+    output_state: Any = field(default_factory=dict)
     check_policy_results: dict[str, bool] = field(default_factory=dict)
     route_policy_results: dict[str, str | None] = field(default_factory=dict)
     evaluation_results: dict[str, "EvaluationResult"] = field(default_factory=dict)

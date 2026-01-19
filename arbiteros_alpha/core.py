@@ -14,10 +14,10 @@ from typing import Any, Callable, Literal
 from langgraph.pregel import Pregel, _loop
 from langgraph.types import Command
 
+from .evaluation import EvaluationResult, NodeEvaluator
 from .history import History, HistoryItem
 from .instructions import InstructionType
 from .policy import PolicyChecker, PolicyRouter
-from .evaluation import EvaluationResult, NodeEvaluator
 
 logger = logging.getLogger(__name__)
 
@@ -252,10 +252,22 @@ class ArbiterOSAlpha:
                     f"Executing instruction: {instruction_type.__class__.__name__}.{instruction_type.name}"
                 )
 
+                # Capture input state from arguments
+                input_state = None
+                if self.backend == "vanilla":
+                    # For vanilla backend, capture all named arguments
+                    sig = inspect.signature(func)
+                    bound_args = sig.bind(*args, **kwargs)
+                    bound_args.apply_defaults()
+                    input_state = bound_args.arguments
+                else:
+                    # For langgraph backend, usually the first argument is the state
+                    input_state = args[0] if args else None
+
                 history_item = HistoryItem(
                     timestamp=datetime.datetime.now(),
                     instruction=instruction_type,
-                    input_state=args[0],
+                    input_state=input_state,
                 )
 
                 if self.backend == "vanilla":
