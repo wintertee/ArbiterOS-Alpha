@@ -17,6 +17,8 @@ class PolicyChecker(ABC):
     custom validation logic.
     """
 
+    name: str
+
     def check_before(self, history: History) -> bool:
         """Validate constraints before instruction execution.
 
@@ -29,7 +31,7 @@ class PolicyChecker(ABC):
         Raises:
             RuntimeError: If validation fails.
         """
-        pass
+        raise NotImplementedError
 
 
 @dataclass
@@ -40,7 +42,9 @@ class PolicyRouter(ABC):
     the execution flow to a different node based on policy conditions.
     """
 
-    def route_after(self, history: History) -> str:
+    name: str
+
+    def route_after(self, history: History) -> str | None:
         """Determine the next node to execute based on policy conditions.
 
         Args:
@@ -49,7 +53,7 @@ class PolicyRouter(ABC):
         Returns:
             The name of the target node to route to, or None to continue normal flow.
         """
-        pass
+        raise NotImplementedError
 
 
 @dataclass
