@@ -8,6 +8,8 @@ This document outlines the standards and best practices that AI agents must foll
 
 All Python commands must be executed using `uv run` to ensure consistent environment management.
 
+For running examples, use `uv run -m example.<example_name>`.
+
 ### 2. Google Style Docstrings
 
 All code comments and docstrings must follow [Google Python Style Guide](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings).
@@ -145,39 +147,6 @@ class ArbiterGraph:
 - **Checkpoint API:** `langgraph/checkpoint/`
 - **Repository:** https://github.com/langchain-ai/langgraph
 
-### 4. Migration Example
-
-**Users should be able to migrate with minimal changes:**
-
-```python
-# Original LangGraph code
-from langgraph.graph import StateGraph, END
-
-graph = StateGraph(MyState)
-graph.add_node("generate", generate_fn)
-graph.add_node("verify", verify_fn)
-graph.add_edge("generate", "verify")
-app = graph.compile()
-
-# ↓↓↓ Migration to ArbiterOS (ONLY 3 changes) ↓↓↓
-
-# 1. Add decorators to existing functions
-@instruction(instruction_type=InstructionType.GENERATE, ...)
-def generate_fn(state): ...
-
-@instruction(instruction_type=InstructionType.VERIFY, ...)
-def verify_fn(state): ...
-
-# 2. Change import and add policy
-from arbiteros import ArbiterGraph  # Changed from StateGraph
-policy_config = PolicyConfig.from_yaml("policy.yaml")
-
-graph = ArbiterGraph(MyState, policy_config)  # Added policy_config
-graph.add_node("generate", generate_fn)  # Same API!
-graph.add_node("verify", verify_fn)
-graph.add_edge("generate", "verify")
-app = graph.compile()  # Same API!
-```
 
 ## Testing Standards
 
@@ -185,18 +154,3 @@ app = graph.compile()  # Same API!
 - Integration tests for component interactions
 - Test edge cases and error handling
 - Use Arrange-Act-Assert pattern
-
-
-
-## Checklist
-
-- [ ] All Python commands use `uv run`
-- [ ] All docstrings follow Google style
-- [ ] Unit tests are written and pass
-- [ ] Code follows naming conventions
-- [ ] Type hints are included
-- [ ] Error messages are clear and helpful
-- [ ] Checked LangGraph source before implementing new classes
-- [ ] Reused LangGraph's native types when possible
-- [ ] ArbiterGraph delegates to StateGraph (thin wrapper pattern)
-- [ ] API maintains LangGraph compatibility (add_node, add_edge, compile)
