@@ -131,6 +131,7 @@ def main(
             parsed.agent_type = agent_type  # type: ignore
 
         logger.detected_agent_type(parsed.agent_type, parsed.compile_lineno)
+        logger.detected_langfuse(parsed.has_existing_langfuse)
 
         # Check if already transformed
         if parsed.has_existing_arbiteros:

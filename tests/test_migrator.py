@@ -350,7 +350,10 @@ class TestCodeGenerator:
             )
 
             assert result.success is True
-            assert not any("Added import" in change for change in result.changes)
+            assert not any(
+                "Added import: from arbiteros_alpha import ArbiterOSAlpha" in change
+                for change in result.changes
+            )
         finally:
             temp_path.unlink()
 
@@ -372,7 +375,7 @@ class TestCodeGenerator:
 
         assert isinstance(transformed, str)
         assert "from arbiteros_alpha import ArbiterOSAlpha" in transformed
-        assert "@os.instruction(Instr.GENERATE)" in transformed
+        assert "@arbiter_os.instruction(Instr.GENERATE)" in transformed
 
 
 # ============================================================================
