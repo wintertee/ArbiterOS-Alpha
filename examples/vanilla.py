@@ -1,5 +1,4 @@
 import logging
-from typing import TypedDict
 
 from rich.logging import RichHandler
 
@@ -32,65 +31,54 @@ arbiter_os.add_policy_checker(history_checker)
 # 2. basic modules
 
 
-class State(TypedDict):
-    """State for a simple AI assistant with tool usage and self-evaluation."""
-
-    query: str
-    response: str
-    tool_result: str
-    confidence: float
-
-
 @arbiter_os.instruction(Instr.GENERATE)
-def generate(state: State) -> State:
-    """Generate a response to the user query."""
-
-    # Check if this is a retry (response already exists)
-    is_retry = bool(state.get("response"))
-
-    if is_retry:
-        # On retry, generate a longer, better response
-        response = "Here is my comprehensive and detailed response with much more content and explanation."
-    else:
-        # First attempt: short response (will have low confidence)
-        response = "Short reply."
-
-    return {"response": response}
+def generate(query: str, tools: list[str]) -> dict:
+    """Simulate an LLM deciding which tool to call."""
+    print(f"Agent thinking about query: '{query}' with tools: {tools}...")
+    # Simulate picking the first available tool
+    selected_tool = tools[0] if tools else "none"
+    return {"tool": selected_tool, "args": {"q": query}}
 
 
 @arbiter_os.instruction(Instr.TOOL_CALL)
-def tool_call(state: State) -> State:
-    """Call external tools to enhance the response."""
-    return {"tool_result": "ok"}
+def tool_call(tool_name, tool_args) -> str:
+    """Execute the tool call suggested by the agent."""
+    print(f"Executing tool '{tool_name}' with args {tool_args}...")
+    return f"Result from {tool_name} is 'AI is a field of computer science...'"
 
 
 @arbiter_os.instruction(Instr.EVALUATE_PROGRESS)
-def evaluate(state: State) -> State:
+def evaluate(response: str, criteria: list[str]) -> float:
     """Evaluate confidence in the response quality."""
     # Heuristic: response quality based on length
-    # Short response (<60 chars) = low confidence (<0.6)
-    # Longer response (>=60 chars) = high confidence (>=0.6)
-    response_length = len(state["response"])
+    response_length = len(response)
     confidence = min(response_length / 100.0, 1.0)
-    return {"confidence": confidence}
+    print(f"Evaluating against {criteria}...")
+    return confidence
 
 
 def main():
     # 3. Run instructions
 
-    state: State = {
-        "query": "What is AI?",
-        "response": "",
-        "tool_result": "",
-        "confidence": 0.0,
-    }
+    query = "What is AI?"
+    tool_result = ""
+    confidence = 0.0
 
-    state.update(generate(state))
-    print(f"{state=}\n")
-    state.update(tool_call(state))
-    print(f"{state=}\n")
-    state.update(evaluate(state))
-    print(f"{state=}\n")
+    available_tools = ["web_search", "calculator"]
+
+    # 1. Agent decides what to do
+    decision = generate(query, tools=available_tools)
+    print(f"{decision=}\n")
+
+    # 2. Execute the tool
+    func_name = decision["tool"]
+    func_args = decision["args"]
+    tool_result = tool_call(func_name, func_args)
+    print(f"{tool_result=}\n")
+
+    # 3. Evaluate the result (using tool_result as the 'response' to evaluate)
+    confidence = evaluate(tool_result, criteria=["informativeness", "accuracy"])
+    print(f"{confidence=}\n")
 
 
 if __name__ == "__main__":
