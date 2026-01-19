@@ -41,7 +41,7 @@ def generate(query: str, tools: list[str]) -> dict:
 
 
 @arbiter_os.instruction(Instr.TOOL_CALL)
-def tool_call(tool_name, tool_args) -> str:
+def tool_call(tool_name: str, tool_args: dict) -> str:
     """Execute the tool call suggested by the agent."""
     print(f"Executing tool '{tool_name}' with args {tool_args}...")
     return f"Result from {tool_name} is 'AI is a field of computer science...'"
