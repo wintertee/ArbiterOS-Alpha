@@ -16,8 +16,20 @@ from langgraph.types import Command
 
 from .evaluation import EvaluationResult, NodeEvaluator
 from .history import History, HistoryItem
-from .instructions import InstructionType
+from .instructions import (
+    InstructionType,
+    CognitiveCore,
+    MemoryCore,
+    ExecutionCore,
+    NormativeCore,
+    MetacognitiveCore,
+    AdaptiveCore,
+    SocialCore,
+    AffectiveCore,
+)
 from .policy import PolicyChecker, PolicyRouter
+
+from langfuse import Langfuse
 
 logger = logging.getLogger(__name__)
 
@@ -71,6 +83,9 @@ class ArbiterOSAlpha:
 
         if self.backend == "langgraph":
             self._patch_pregel_loop()
+
+        self.langfuse = Langfuse()
+        self.span = self.langfuse.start_span(name="arbiteros_alpha_record")
 
     def add_policy_checker(self, checker: PolicyChecker) -> None:
         """Register a policy checker for validation.
@@ -212,6 +227,23 @@ class ArbiterOSAlpha:
                 # Evaluation failures should not interrupt execution
         return results
 
+    def _get_observation_type(self, instruction_type: InstructionType) -> str:
+        """Need further implementation"""
+        mapping = {
+            CognitiveCore: "generation",
+            MemoryCore: "chain",
+            ExecutionCore: "tool",
+            NormativeCore: "guardrail",
+            MetacognitiveCore: "evaluator",
+            AdaptiveCore: "retriever",
+            SocialCore: "chain",
+            AffectiveCore: "chain",
+        }
+        core_type = type(instruction_type)
+        if core_type not in mapping:
+            raise ValueError(f"Invalid instruction type: {instruction_type}")
+        return mapping[core_type]   
+
     def instruction(
         self, instruction_type: InstructionType
     ) -> Callable[[Callable], Callable]:
@@ -275,17 +307,30 @@ class ArbiterOSAlpha:
 
                 self.history.add_entry(history_item)
 
-                history_item.check_policy_results, all_passed = self._check_before()
+                # langfuse record
+                observation_type = self._get_observation_type(instruction_type)
 
-                result = func(*args, **kwargs)
-                logger.debug(f"Instruction {instruction_type.name} returned: {result}")
-                history_item.output_state = result
+                with self.span.start_as_current_observation(
+                    as_type=observation_type,
+                    name=func.__name__,
+                ) as generation:
 
-                # Evaluate node execution quality
-                if self.evaluators:
-                    history_item.evaluation_results = self._evaluate_node()
+                    history_item.check_policy_results, all_passed = self._check_before()
 
-                history_item.route_policy_results, destination = self._route_after()
+                    result = func(*args, **kwargs)
+
+                    logger.debug(f"Instruction {instruction_type.name} returned: {result}")
+                    history_item.output_state = result
+
+                    # Evaluate node execution quality
+                    if self.evaluators:
+                        history_item.evaluation_results = self._evaluate_node()
+
+                    history_item.route_policy_results, destination = self._route_after()
+
+                    metadata = history_item.check_policy_results | history_item.evaluation_results | history_item.route_policy_results
+
+                    generation.update(input=input_state, output=result, metadata=metadata)
 
                 if destination:
                     return Command(update=result, goto=destination)
