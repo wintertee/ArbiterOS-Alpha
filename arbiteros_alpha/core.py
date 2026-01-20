@@ -242,7 +242,7 @@ class ArbiterOSAlpha:
         core_type = type(instruction_type)
         if core_type not in mapping:
             raise ValueError(f"Invalid instruction type: {instruction_type}")
-        return mapping[core_type]   
+        return mapping[core_type]
 
     def instruction(
         self, instruction_type: InstructionType
@@ -314,12 +314,13 @@ class ArbiterOSAlpha:
                     as_type=observation_type,
                     name=func.__name__,
                 ) as generation:
-
                     history_item.check_policy_results, all_passed = self._check_before()
 
                     result = func(*args, **kwargs)
 
-                    logger.debug(f"Instruction {instruction_type.name} returned: {result}")
+                    logger.debug(
+                        f"Instruction {instruction_type.name} returned: {result}"
+                    )
                     history_item.output_state = result
 
                     # Evaluate node execution quality
@@ -328,9 +329,15 @@ class ArbiterOSAlpha:
 
                     history_item.route_policy_results, destination = self._route_after()
 
-                    metadata = history_item.check_policy_results | history_item.evaluation_results | history_item.route_policy_results
+                    metadata = (
+                        history_item.check_policy_results
+                        | history_item.evaluation_results
+                        | history_item.route_policy_results
+                    )
 
-                    generation.update(input=input_state, output=result, metadata=metadata)
+                    generation.update(
+                        input=input_state, output=result, metadata=metadata
+                    )
 
                 if destination:
                     return Command(update=result, goto=destination)
