@@ -228,7 +228,7 @@ class ArbiterOSAlpha:
         return results
 
     def _get_observation_type(self, instruction_type: InstructionType) -> str:
-        """Need further implementation"""
+        """Maps an instruction type to a langfuse observation type."""
         mapping = {
             CognitiveCore: "generation",
             MemoryCore: "chain",
