@@ -87,6 +87,11 @@ class ArbiterOSAlpha:
         self.langfuse = Langfuse()
         self.span = self.langfuse.start_span(name="arbiteros_alpha_record")
 
+    def __del__(self):
+        """Flushes all buffered data and ends the main span."""
+        self.span.end()
+        self.langfuse.flush()
+
     def add_policy_checker(self, checker: PolicyChecker) -> None:
         """Register a policy checker for validation.
 
