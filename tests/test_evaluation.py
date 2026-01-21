@@ -83,14 +83,18 @@ class TestThresholdEvaluator:
             name="confidence_check", key="confidence", threshold=0.7
         )
 
-        arbiter_os = ArbiterOSAlpha(backend="vanilla")
+        arbiter_os = ArbiterOSAlpha(backend="native")
 
         @arbiter_os.instruction(CognitiveCore.GENERATE)
         def generate(state):
             return {"confidence": 0.9}
 
-        arbiter_os.history.enter_next_superstep(["generate"])
-        generate({"query": "test"})
+        @arbiter_os.rollout()
+        def run():
+            arbiter_os.history.enter_next_superstep(["generate"])
+            generate({"query": "test"})
+
+        run()
 
         result = evaluator.evaluate(arbiter_os.history)
 
@@ -105,14 +109,18 @@ class TestThresholdEvaluator:
             name="confidence_check", key="confidence", threshold=0.7
         )
 
-        arbiter_os = ArbiterOSAlpha(backend="vanilla")
+        arbiter_os = ArbiterOSAlpha(backend="native")
 
         @arbiter_os.instruction(CognitiveCore.GENERATE)
         def generate(state):
             return {"confidence": 0.5}
 
-        arbiter_os.history.enter_next_superstep(["generate"])
-        generate({"query": "test"})
+        @arbiter_os.rollout()
+        def run():
+            arbiter_os.history.enter_next_superstep(["generate"])
+            generate({"query": "test"})
+
+        run()
 
         result = evaluator.evaluate(arbiter_os.history)
 
@@ -126,14 +134,18 @@ class TestThresholdEvaluator:
             name="confidence_check", key="confidence", threshold=0.7
         )
 
-        arbiter_os = ArbiterOSAlpha(backend="vanilla")
+        arbiter_os = ArbiterOSAlpha(backend="native")
 
         @arbiter_os.instruction(CognitiveCore.GENERATE)
         def generate(state):
             return {}  # No confidence key
 
-        arbiter_os.history.enter_next_superstep(["generate"])
-        generate({"query": "test"})
+        @arbiter_os.rollout()
+        def run():
+            arbiter_os.history.enter_next_superstep(["generate"])
+            generate({"query": "test"})
+
+        run()
 
         result = evaluator.evaluate(arbiter_os.history)
 
@@ -146,7 +158,7 @@ class TestArbiterOSEvaluatorIntegration:
 
     def test_add_evaluator(self):
         """Test adding an evaluator to ArbiterOSAlpha."""
-        arbiter_os = ArbiterOSAlpha(backend="vanilla")
+        arbiter_os = ArbiterOSAlpha(backend="native")
         evaluator = ThresholdEvaluator(name="test", key="score", threshold=0.5)
 
         arbiter_os.add_evaluator(evaluator)
@@ -156,7 +168,7 @@ class TestArbiterOSEvaluatorIntegration:
 
     def test_evaluator_runs_on_instruction_execution(self):
         """Test that evaluators run when instructions execute."""
-        arbiter_os = ArbiterOSAlpha(backend="vanilla")
+        arbiter_os = ArbiterOSAlpha(backend="native")
         evaluator = ThresholdEvaluator(
             name="quality_check", key="quality", threshold=0.6
         )
@@ -166,8 +178,12 @@ class TestArbiterOSEvaluatorIntegration:
         def generate(state):
             return {"quality": 0.8}
 
-        arbiter_os.history.enter_next_superstep(["generate"])
-        generate({"query": "test"})
+        @arbiter_os.rollout()
+        def run():
+            arbiter_os.history.enter_next_superstep(["generate"])
+            generate({"query": "test"})
+
+        run()
 
         # Check that evaluation results were recorded in history
         history_item = arbiter_os.history.entries[-1][-1]
@@ -178,7 +194,7 @@ class TestArbiterOSEvaluatorIntegration:
 
     def test_multiple_evaluators_run_independently(self):
         """Test that multiple evaluators run independently."""
-        arbiter_os = ArbiterOSAlpha(backend="vanilla")
+        arbiter_os = ArbiterOSAlpha(backend="native")
 
         eval1 = ThresholdEvaluator(name="eval1", key="metric1", threshold=0.5)
         eval2 = ThresholdEvaluator(name="eval2", key="metric2", threshold=0.7)
@@ -190,8 +206,12 @@ class TestArbiterOSEvaluatorIntegration:
         def generate(state):
             return {"metric1": 0.6, "metric2": 0.9}
 
-        arbiter_os.history.enter_next_superstep(["generate"])
-        generate({"query": "test"})
+        @arbiter_os.rollout()
+        def run():
+            arbiter_os.history.enter_next_superstep(["generate"])
+            generate({"query": "test"})
+
+        run()
 
         history_item = arbiter_os.history.entries[-1][-1]
         assert len(history_item.evaluation_results) == 2
@@ -205,15 +225,19 @@ class TestArbiterOSEvaluatorIntegration:
             def evaluate(self, history: History) -> EvaluationResult:
                 raise RuntimeError("Evaluator failed!")
 
-        arbiter_os = ArbiterOSAlpha(backend="vanilla")
+        arbiter_os = ArbiterOSAlpha(backend="native")
         arbiter_os.add_evaluator(BrokenEvaluator(name="broken"))
 
         @arbiter_os.instruction(CognitiveCore.GENERATE)
         def generate(state):
             return {"result": "success"}
 
-        arbiter_os.history.enter_next_superstep(["generate"])
-        result = generate({"query": "test"})
+        @arbiter_os.rollout()
+        def run():
+            arbiter_os.history.enter_next_superstep(["generate"])
+            return generate({"query": "test"})
+
+        result = run()
 
         # Execution should complete despite evaluator failure
         assert result == {"result": "success"}
@@ -234,24 +258,32 @@ class TestArbiterOSEvaluatorIntegration:
                     feedback=f"Total executions: {total_items}",
                 )
 
-        arbiter_os = ArbiterOSAlpha(backend="vanilla")
+        arbiter_os = ArbiterOSAlpha(backend="native")
         arbiter_os.add_evaluator(HistoryAwareEvaluator(name="history_check"))
 
         @arbiter_os.instruction(CognitiveCore.GENERATE)
         def generate(state):
             return {"result": "ok"}
 
-        # First execution
-        arbiter_os.history.enter_next_superstep(["generate"])
-        generate({"query": "test1"})
-        eval1 = arbiter_os.history.entries[-1][-1].evaluation_results["history_check"]
-        assert eval1.passed is False  # Only 1 execution
+        @arbiter_os.rollout()
+        def run_session():
+            # First execution
+            arbiter_os.history.enter_next_superstep(["generate"])
+            generate({"query": "test1"})
+            eval1 = arbiter_os.history.entries[-1][-1].evaluation_results[
+                "history_check"
+            ]
+            assert eval1.passed is False  # Only 1 execution
 
-        # Second execution
-        arbiter_os.history.enter_next_superstep(["generate"])
-        generate({"query": "test2"})
-        eval2 = arbiter_os.history.entries[-1][-1].evaluation_results["history_check"]
-        assert eval2.passed is True  # Now 2 executions
+            # Second execution
+            arbiter_os.history.enter_next_superstep(["generate"])
+            generate({"query": "test2"})
+            eval2 = arbiter_os.history.entries[-1][-1].evaluation_results[
+                "history_check"
+            ]
+            assert eval2.passed is True  # Now 2 executions
+
+        run_session()
 
 
 class TestEvaluatorFiltering:
@@ -280,7 +312,7 @@ class TestEvaluatorFiltering:
                 evaluated_instructions.append(current.instruction)
                 return EvaluationResult(score=1.0, passed=True, feedback="evaluated")
 
-        arbiter_os = ArbiterOSAlpha(backend="vanilla")
+        arbiter_os = ArbiterOSAlpha(backend="native")
         # Only evaluate GENERATE nodes
         arbiter_os.add_evaluator(
             TrackingEvaluator(
@@ -297,10 +329,14 @@ class TestEvaluatorFiltering:
             return {"critique": "good"}
 
         # Execute both nodes
-        arbiter_os.history.enter_next_superstep(["generate"])
-        generate({})
-        arbiter_os.history.enter_next_superstep(["reflect"])
-        reflect({})
+        @arbiter_os.rollout()
+        def run_test():
+            arbiter_os.history.enter_next_superstep(["generate"])
+            generate({})
+            arbiter_os.history.enter_next_superstep(["reflect"])
+            reflect({})
+
+        run_test()
 
         # Only GENERATE should have been evaluated
         assert len(evaluated_instructions) == 1
@@ -315,7 +351,7 @@ class TestEvaluatorFiltering:
                 evaluated_count[0] += 1
                 return EvaluationResult(score=1.0, passed=True, feedback="evaluated")
 
-        arbiter_os = ArbiterOSAlpha(backend="vanilla")
+        arbiter_os = ArbiterOSAlpha(backend="native")
         # No target_instructions = evaluate everything
         arbiter_os.add_evaluator(UnfilteredEvaluator(name="unfiltered"))
 
@@ -328,10 +364,14 @@ class TestEvaluatorFiltering:
             return {"critique": "good"}
 
         # Execute both nodes
-        arbiter_os.history.enter_next_superstep(["generate"])
-        generate({})
-        arbiter_os.history.enter_next_superstep(["reflect"])
-        reflect({})
+        @arbiter_os.rollout()
+        def run_test():
+            arbiter_os.history.enter_next_superstep(["generate"])
+            generate({})
+            arbiter_os.history.enter_next_superstep(["reflect"])
+            reflect({})
+
+        run_test()
 
         # Both should have been evaluated
         assert evaluated_count[0] == 2
@@ -346,7 +386,7 @@ class TestEvaluatorFiltering:
                 evaluated_instructions.append(current.instruction)
                 return EvaluationResult(score=1.0, passed=True, feedback="evaluated")
 
-        arbiter_os = ArbiterOSAlpha(backend="vanilla")
+        arbiter_os = ArbiterOSAlpha(backend="native")
         # Target both GENERATE and REFLECT
         arbiter_os.add_evaluator(
             MultiTargetEvaluator(
@@ -368,12 +408,16 @@ class TestEvaluatorFiltering:
             return {}
 
         # Execute all three nodes
-        arbiter_os.history.enter_next_superstep(["generate"])
-        generate({})
-        arbiter_os.history.enter_next_superstep(["reflect"])
-        reflect({})
-        arbiter_os.history.enter_next_superstep(["verify"])
-        verify({})
+        @arbiter_os.rollout()
+        def run_test():
+            arbiter_os.history.enter_next_superstep(["generate"])
+            generate({})
+            arbiter_os.history.enter_next_superstep(["reflect"])
+            reflect({})
+            arbiter_os.history.enter_next_superstep(["verify"])
+            verify({})
+
+        run_test()
 
         # Only GENERATE and REFLECT should be evaluated
         assert len(evaluated_instructions) == 2
