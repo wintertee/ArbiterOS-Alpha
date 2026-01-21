@@ -349,15 +349,10 @@ class ArbiterOSAlpha:
 
                     history_item.route_policy_results, destination = self._route_after()
                     metadata = (
-                        history_item.check_policy_results
-                        | getattr(history_item, "evaluation_results", {})
-                        | history_item.route_policy_results
-                    )
-                    metadata = (
-                        history_item.check_policy_results
-                        | history_item.evaluation_results
-                        | history_item.route_policy_results
-                    )
+	                        history_item.check_policy_results
+	                        | getattr(history_item, "evaluation_results", {})
+	                        | history_item.route_policy_results
+	                    )
 
                     generation.update(
                         input=input_state, output=result, metadata=metadata
