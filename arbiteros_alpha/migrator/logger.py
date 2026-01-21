@@ -102,13 +102,13 @@ class MigrationLogger:
         """Log the detected agent type.
 
         Args:
-            agent_type: Either "langgraph" or "vanilla".
+            agent_type: Either "langgraph" or "native".
             compile_line: Line number of compile() call for LangGraph agents.
         """
         type_display = (
             "LangGraph-based agent"
             if agent_type == "langgraph"
-            else "Vanilla Python agent"
+            else "native Python agent"
         )
         self.console.print(f"      [green]✓[/green] Detected: {type_display}")
         if compile_line and self.verbose:
