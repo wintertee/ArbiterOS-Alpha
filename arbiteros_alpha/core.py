@@ -83,6 +83,7 @@ class ArbiterOSAlpha:
         self.policy_checkers: list[PolicyChecker] = []
         self.policy_routers: list[PolicyRouter] = []
         self.evaluators: list[NodeEvaluator] = []
+        self._in_rollout: bool = False
 
         if self.backend == "langgraph":
             self._patch_pregel_loop()
@@ -263,6 +264,11 @@ class ArbiterOSAlpha:
         def decorator(func: Callable) -> Callable:
             @functools.wraps(func)
             def wrapper(*args, **kwargs) -> Any:
+                if not self._in_rollout:
+                    raise RuntimeError(
+                        "Instructions must be executed within a @arbiter_os.rollout context."
+                    )
+
                 logger.debug(
                     f"Executing instruction: {instruction_type.__class__.__name__}.{instruction_type.name}"
                 )
@@ -331,8 +337,12 @@ class ArbiterOSAlpha:
         def decorator(func: Callable) -> Callable:
             @functools.wraps(func)
             def wrapper(*args, **kwargs) -> Any:
+                if self._in_rollout:
+                    raise RuntimeError("Nested rollouts are not allowed.")
+
                 # Initialize a fresh history for this new rollout
                 self.history = History()
+                self._in_rollout = True
                 logger.info(f"--- Starting Rollout: {func.__name__} ---")
 
                 try:
@@ -342,6 +352,8 @@ class ArbiterOSAlpha:
                 except Exception:
                     logger.error(f"--- Rollout Failed: {func.__name__} ---")
                     raise
+                finally:
+                    self._in_rollout = False
 
             return wrapper
 
