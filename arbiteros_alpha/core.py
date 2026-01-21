@@ -11,12 +11,23 @@ import logging
 import weakref
 from typing import Any, Callable, Literal
 
+from langfuse import Langfuse
 from langgraph.pregel import Pregel, _loop
 from langgraph.types import Command
 
 from .evaluation import EvaluationResult, NodeEvaluator
 from .history import History, HistoryItem
-from .instructions import InstructionType
+from .instructions import (
+    AdaptiveCore,
+    AffectiveCore,
+    CognitiveCore,
+    ExecutionCore,
+    InstructionType,
+    MemoryCore,
+    MetacognitiveCore,
+    NormativeCore,
+    SocialCore,
+)
 from .policy import PolicyChecker, PolicyRouter
 
 logger = logging.getLogger(__name__)
@@ -87,6 +98,9 @@ class ArbiterOSAlpha:
 
         if self.backend == "langgraph":
             self._patch_pregel_loop()
+
+        self.langfuse = Langfuse()
+        self.span = None
 
     def add_policy_checker(self, checker: PolicyChecker) -> None:
         """Register a policy checker for validation.
@@ -228,6 +242,23 @@ class ArbiterOSAlpha:
                 # Evaluation failures should not interrupt execution
         return results
 
+    def _get_observation_type(self, instruction_type: InstructionType) -> str:
+        """Maps an instruction type to a langfuse observation type."""
+        mapping = {
+            CognitiveCore: "generation",
+            MemoryCore: "chain",
+            ExecutionCore: "tool",
+            NormativeCore: "guardrail",
+            MetacognitiveCore: "evaluator",
+            AdaptiveCore: "retriever",
+            SocialCore: "chain",
+            AffectiveCore: "chain",
+        }
+        core_type = type(instruction_type)
+        if core_type not in mapping:
+            raise ValueError(f"Invalid instruction type: {instruction_type}")
+        return mapping[core_type]
+
     def instruction(
         self, instruction_type: InstructionType
     ) -> Callable[[Callable], Callable]:
@@ -296,17 +327,36 @@ class ArbiterOSAlpha:
 
                 self.history.add_entry(history_item)
 
-                history_item.check_policy_results, all_passed = self._check_before()
+                # langfuse record
+                observation_type = self._get_observation_type(instruction_type)
 
-                result = func(*args, **kwargs)
-                logger.debug(f"Instruction {instruction_type.name} returned: {result}")
-                history_item.output_state = result
+                with self.span.start_as_current_observation(
+                    as_type=observation_type,
+                    name=func.__name__,
+                ) as generation:
+                    history_item.check_policy_results, all_passed = self._check_before()
 
-                # Evaluate node execution quality
-                if self.evaluators:
-                    history_item.evaluation_results = self._evaluate_node()
+                    result = func(*args, **kwargs)
 
-                history_item.route_policy_results, destination = self._route_after()
+                    logger.debug(
+                        f"Instruction {instruction_type.name} returned: {result}"
+                    )
+                    history_item.output_state = result
+
+                    # Evaluate node execution quality
+                    if self.evaluators:
+                        history_item.evaluation_results = self._evaluate_node()
+
+                    history_item.route_policy_results, destination = self._route_after()
+                    metadata = (
+                        history_item.check_policy_results
+                        | getattr(history_item, "evaluation_results", {})
+                        | history_item.route_policy_results
+                    )
+
+                    generation.update(
+                        input=input_state, output=result, metadata=metadata
+                    )
 
                 if destination:
                     return Command(update=result, goto=destination)
@@ -342,6 +392,7 @@ class ArbiterOSAlpha:
 
                 # Initialize a fresh history for this new rollout
                 self.history = History()
+                self.span = self.langfuse.start_span(name="arbiteros_alpha_record")
                 self._in_rollout = True
                 logger.info(f"--- Starting Rollout: {func.__name__} ---")
 
@@ -355,6 +406,8 @@ class ArbiterOSAlpha:
                     )
                     raise
                 finally:
+                    self.span.end()
+                    self.langfuse.flush()
                     self._in_rollout = False
 
             return wrapper
