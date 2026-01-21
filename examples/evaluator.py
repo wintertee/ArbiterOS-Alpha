@@ -34,7 +34,7 @@ logging.basicConfig(
 
 
 # 1. Setup OS
-arbiter_os = ArbiterOSAlpha(backend="vanilla")
+arbiter_os = ArbiterOSAlpha(backend="native")
 
 
 # 2. Define custom evaluators
@@ -198,6 +198,7 @@ def verify(state: State) -> State:
 # 5. Run workflow with different scenarios
 
 
+@arbiter_os.rollout()
 def main():
     """Run the workflow with different query types."""
     scenarios = [

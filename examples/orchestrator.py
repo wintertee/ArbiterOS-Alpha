@@ -131,7 +131,14 @@ orchestrator_worker = orchestrator_worker_builder.compile()
 
 arbiter_os.register_compiled_graph(orchestrator_worker)
 
-# Invoke
-state = orchestrator_worker.invoke({"topic": "Create a report on LLM scaling laws"})
 
-arbiter_os.history.pprint()
+@arbiter_os.rollout()
+def main():
+    # Invoke
+    state = orchestrator_worker.invoke({"topic": "Create a report on LLM scaling laws"})
+    return state
+
+
+if __name__ == "__main__":
+    main()
+    arbiter_os.history.pprint()
