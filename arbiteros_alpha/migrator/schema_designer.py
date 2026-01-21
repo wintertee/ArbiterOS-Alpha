@@ -122,26 +122,26 @@ class SchemaDesigner:
             logger.error(f"LLM invocation failed: {e}")
             return None
 
-    def _ensure_enums_defined(self, result: LLMSchemaDesignOutput) -> LLMSchemaDesignOutput:
+    def _ensure_enums_defined(
+        self, result: LLMSchemaDesignOutput
+    ) -> LLMSchemaDesignOutput:
         """Ensure all referenced enum types are defined in the schemas list.
-        
+
         Scans all schema fields for enum types and automatically generates missing enum definitions.
-        
+
         Args:
             result: The schema design output from the LLM.
-            
+
         Returns:
             Updated result with all required enums defined.
         """
         import re
-        
+
         # Extract all existing enum names
         existing_enums = {
-            schema.class_name 
-            for schema in result.schemas 
-            if schema.is_enum
+            schema.class_name for schema in result.schemas if schema.is_enum
         }
-        
+
         # Find all referenced enum types in field_type
         referenced_enums = set()
         for schema in result.schemas:
@@ -150,25 +150,32 @@ class SchemaDesigner:
             for field in schema.fields:
                 # Look for enum-like types (capitalized words that look like enum names)
                 # Common patterns: TradeDecision, RiskLevel, Priority, Status
-                matches = re.findall(r'\b([A-Z][a-zA-Z]*(?:Decision|Level|Priority|Status|Type|Mode|State))\b', field.field_type)
+                matches = re.findall(
+                    r"\b([A-Z][a-zA-Z]*(?:Decision|Level|Priority|Status|Type|Mode|State))\b",
+                    field.field_type,
+                )
                 referenced_enums.update(matches)
-        
+
         # Find missing enums
         missing_enums = referenced_enums - existing_enums
-        
+
         if missing_enums:
-            logger.warning(f"Found {len(missing_enums)} missing enum definitions: {missing_enums}")
-            
+            logger.warning(
+                f"Found {len(missing_enums)} missing enum definitions: {missing_enums}"
+            )
+
             # Generate enum definitions for missing enums
             new_enums = []
             for enum_name in sorted(missing_enums):
                 # Try to infer enum values based on common patterns
                 enum_values = self._infer_enum_values(enum_name)
-                
+
                 if enum_values:
-                    logger.info(f"Auto-generating enum {enum_name} with values: {enum_values}")
+                    logger.info(
+                        f"Auto-generating enum {enum_name} with values: {enum_values}"
+                    )
                     from arbiteros_alpha.migrator.schemas import PydanticSchemaSpec
-                    
+
                     enum_schema = PydanticSchemaSpec(
                         class_name=enum_name,
                         description=f"{enum_name} enum for type safety.",
@@ -176,22 +183,22 @@ class SchemaDesigner:
                         is_enum=True,
                         enum_values=enum_values,
                         base_class="str, Enum",
-                        function_names=[]
+                        function_names=[],
                     )
                     new_enums.append(enum_schema)
-            
+
             # Prepend enums to schemas list (enums must be defined first)
             result.schemas = new_enums + result.schemas
             logger.info(f"Added {len(new_enums)} auto-generated enum definitions")
-        
+
         return result
-    
+
     def _infer_enum_values(self, enum_name: str) -> list[str]:
         """Infer likely enum values based on enum name patterns.
-        
+
         Args:
             enum_name: Name of the enum (e.g., "TradeDecision", "RiskLevel")
-            
+
         Returns:
             List of likely enum values.
         """
@@ -208,18 +215,20 @@ class SchemaDesigner:
             "Mode": ["AUTO", "MANUAL"],
             "State": ["ACTIVE", "INACTIVE"],
         }
-        
+
         # Try exact match first
         if enum_name in patterns:
             return patterns[enum_name]
-        
+
         # Try suffix match
         for suffix, values in patterns.items():
             if enum_name.endswith(suffix):
                 return values
-        
+
         # Default: return empty and let user define
-        logger.warning(f"Could not infer values for enum {enum_name}, skipping auto-generation")
+        logger.warning(
+            f"Could not infer values for enum {enum_name}, skipping auto-generation"
+        )
         return []
 
     def design(
@@ -249,14 +258,14 @@ class SchemaDesigner:
             return LLMSchemaDesignOutput(
                 schemas=[],
                 imports_needed=[],
-                reasoning="Schema design failed - LLM returned None"
+                reasoning="Schema design failed - LLM returned None",
             )
 
         logger.info(f"Designed {len(result.schemas)} schemas")
 
         # Post-process to ensure all referenced enums are defined
         result = self._ensure_enums_defined(result)
-        
+
         # Post-process to enrich schemas with policy-required fields
         if policy_design:
             result = self._enrich_with_policy_fields(result, policy_design)
@@ -269,64 +278,69 @@ class SchemaDesigner:
         policy_design: "PolicyDesignOutput",
     ) -> LLMSchemaDesignOutput:
         """Enrich schemas with fields required by policies.
-        
+
         Analyzes policy routers to determine what fields they expect in output_state
         and adds those fields to relevant schemas.
-        
+
         Args:
             result: The schema design output from the LLM.
             policy_design: The policy design with checkers and routers.
-            
+
         Returns:
             Updated result with enriched schemas.
         """
-        from .schemas import PydanticFieldSpec
-        
+
         # Extract field requirements from routers
         required_fields = self._extract_policy_field_requirements(policy_design)
-        
+
         if not required_fields:
             logger.info("No policy field requirements found")
             return result
-        
-        logger.info(f"Found {len(required_fields)} policy field requirements: {list(required_fields.keys())}")
-        
+
+        logger.info(
+            f"Found {len(required_fields)} policy field requirements: {list(required_fields.keys())}"
+        )
+
         # Add missing fields to all non-enum schemas
         enriched_count = 0
         for schema in result.schemas:
             if schema.is_enum:
                 continue
-            
+
             existing_field_names = {f.field_name for f in schema.fields}
-            
+
             # Add missing fields
             for field_name, field_spec in required_fields.items():
                 if field_name not in existing_field_names:
-                    logger.info(f"Adding field '{field_name}' to schema {schema.class_name}")
+                    logger.info(
+                        f"Adding field '{field_name}' to schema {schema.class_name}"
+                    )
                     schema.fields.append(field_spec)
                     enriched_count += 1
-        
-        logger.info(f"Enriched {enriched_count} schema fields based on policy requirements")
+
+        logger.info(
+            f"Enriched {enriched_count} schema fields based on policy requirements"
+        )
         return result
-    
+
     def _extract_policy_field_requirements(
         self, policy_design: "PolicyDesignOutput"
     ) -> dict[str, "PydanticFieldSpec"]:
         """Extract field requirements from policy routers.
-        
+
         Analyzes router trigger conditions to determine what fields are expected
         in output_state.
-        
+
         Args:
             policy_design: The policy design output.
-            
+
         Returns:
             Dictionary mapping field names to their PydanticFieldSpec.
         """
         from .schemas import PydanticFieldSpec
-        
+
         required_fields: dict[str, PydanticFieldSpec] = {}
-        
+
         # Common field patterns based on router trigger conditions
         field_patterns = {
             "confidence": PydanticFieldSpec(
@@ -354,11 +368,11 @@ class SchemaDesigner:
                 validators=["ge=0.0", "le=1.0"],
             ),
         }
-        
+
         # Analyze routers to find required fields
         for router in policy_design.routers:
             trigger = router.trigger_condition.lower()
-            
+
             # Check for field mentions in trigger conditions
             for field_name in field_patterns:
                 if field_name in trigger or field_name in str(router.parameters):
@@ -367,7 +381,7 @@ class SchemaDesigner:
                         logger.info(
                             f"Router '{router.class_name}' requires field: {field_name}"
                         )
-        
+
         return required_fields
 
     def _build_design_prompt(
@@ -400,7 +414,9 @@ class SchemaDesigner:
         # Format state fields
         state_section = "\n### State Fields\n"
         for field in analysis.state_fields:
-            state_section += f"- **{field.field_name}** ({field.field_type}): {field.description}\n"
+            state_section += (
+                f"- **{field.field_name}** ({field.field_type}): {field.description}\n"
+            )
             if field.produced_by:
                 state_section += f"  - Produced by: {', '.join(field.produced_by)}\n"
             if field.consumed_by:
@@ -417,28 +433,36 @@ class SchemaDesigner:
                 functions_section += "- Contains LLM invocation\n"
             # Show truncated source
             functions_section += f"```python\n{func.source_code[:500]}{'...' if len(func.source_code) > 500 else ''}\n```\n"
-        
+
         # Format policy requirements (if provided)
         policy_section = ""
         if policy_design:
             policy_section = "\n### Policy Requirements\n\n"
             policy_section += "The following policies will be applied to this system. Schemas MUST include fields that these policies expect:\n\n"
-            
+
             if policy_design.routers:
-                policy_section += "**Policy Routers (require fields in output_state):**\n"
+                policy_section += (
+                    "**Policy Routers (require fields in output_state):**\n"
+                )
                 for router in policy_design.routers:
-                    policy_section += f"- **{router.class_name}**: {router.trigger_condition}\n"
+                    policy_section += (
+                        f"- **{router.class_name}**: {router.trigger_condition}\n"
+                    )
                     if router.parameters:
-                        params_str = ", ".join(f"{k}={v}" for k, v in router.parameters.items())
+                        params_str = ", ".join(
+                            f"{k}={v}" for k, v in router.parameters.items()
+                        )
                         policy_section += f"  - Parameters: {params_str}\n"
                 policy_section += "\n"
-            
+
             if policy_design.checkers:
                 policy_section += "**Policy Checkers (validate constraints):**\n"
                 for checker in policy_design.checkers:
-                    policy_section += f"- **{checker.class_name}**: {checker.description}\n"
+                    policy_section += (
+                        f"- **{checker.class_name}**: {checker.description}\n"
+                    )
                 policy_section += "\n"
-            
+
             policy_section += """**CRITICAL SCHEMA REQUIREMENTS:**
 - All agent output schemas MUST include a `confidence: float` field (0.0-1.0) for confidence-based routing
 - Analysis/decision schemas SHOULD include `quality_score: float` for quality gates

@@ -395,7 +395,7 @@ class RepoScanner:
                     elif isinstance(func, ast.Name):
                         if func.id == "partial":
                             is_partial = True
-                    
+
                     if is_partial and call.args:
                         # First argument to partial is the function
                         first_arg = call.args[0]
@@ -446,9 +446,7 @@ class RepoScanner:
 
         return nodes, edges
 
-    def _parse_add_node(
-        self, node: ast.Call, file_path: str
-    ) -> GraphNodeInfo | None:
+    def _parse_add_node(self, node: ast.Call, file_path: str) -> GraphNodeInfo | None:
         """Parse an add_node call to extract node information.
 
         Args:

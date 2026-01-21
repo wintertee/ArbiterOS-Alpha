@@ -6,7 +6,7 @@ validated JSON I/O.
 """
 
 from enum import Enum
-from typing import Any, Literal
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -194,7 +194,9 @@ class GraphEdgeInfo(BaseModel):
 
     source: str = Field(..., description="Source node name")
     target: str = Field(..., description="Target node name")
-    is_conditional: bool = Field(False, description="Whether this is a conditional edge")
+    is_conditional: bool = Field(
+        False, description="Whether this is a conditional edge"
+    )
     condition_function: str | None = Field(
         None, description="Condition function name if conditional"
     )
@@ -281,11 +283,10 @@ class RepoAnalysisOutput(BaseModel):
     This is the structured output schema for the repository analyzer LLM call.
     """
 
-    framework: AgentFramework = Field(
-        ..., description="The agent framework being used"
-    )
+    framework: AgentFramework = Field(..., description="The agent framework being used")
     domain: str = Field(
-        ..., description="The domain/task of this agent system (e.g., 'trading', 'customer_service')"
+        ...,
+        description="The domain/task of this agent system (e.g., 'trading', 'customer_service')",
     )
     domain_description: str = Field(
         ..., description="Detailed description of what this agent system does"
@@ -300,7 +301,8 @@ class RepoAnalysisOutput(BaseModel):
         default_factory=list, description="Fields in the agent state"
     )
     key_constraints: list[str] = Field(
-        default_factory=list, description="Key constraints/rules identified in the workflow"
+        default_factory=list,
+        description="Key constraints/rules identified in the workflow",
     )
     entry_point_file: str | None = Field(
         None, description="Main entry point file for the agent system"
@@ -333,9 +335,7 @@ class NodeClassificationResult(BaseModel):
     wrapper_name: str = Field(
         ..., description="Suggested wrapper function name (e.g., 'govern_analyst')"
     )
-    is_factory: bool = Field(
-        False, description="Whether this is a factory function"
-    )
+    is_factory: bool = Field(False, description="Whether this is a factory function")
 
 
 class NodeClassificationBatch(BaseModel):
@@ -361,7 +361,8 @@ class PolicyCheckerSpec(BaseModel):
     """Specification for a policy checker to be generated."""
 
     class_name: str = Field(
-        ..., description="Name for the PolicyChecker class (e.g., 'AnalystCompletionChecker')"
+        ...,
+        description="Name for the PolicyChecker class (e.g., 'AnalystCompletionChecker')",
     )
     description: str = Field(
         ..., description="Docstring describing what this checker validates"
@@ -370,7 +371,8 @@ class PolicyCheckerSpec(BaseModel):
         ..., description="Description of the check_before logic"
     )
     parameters: dict[str, Any] = Field(
-        default_factory=dict, description="Parameters for the checker (name -> default value)"
+        default_factory=dict,
+        description="Parameters for the checker (name -> default value)",
     )
     parameter_descriptions: dict[str, str] = Field(
         default_factory=dict, description="Descriptions for each parameter"
@@ -396,17 +398,14 @@ class PolicyRouterSpec(BaseModel):
         ..., description="Description of the route_after logic"
     )
     parameters: dict[str, Any] = Field(
-        default_factory=dict, description="Parameters for the router (name -> default value)"
+        default_factory=dict,
+        description="Parameters for the router (name -> default value)",
     )
     parameter_descriptions: dict[str, str] = Field(
         default_factory=dict, description="Descriptions for each parameter"
     )
-    target_node: str = Field(
-        ..., description="Default target node to route to"
-    )
-    trigger_condition: str = Field(
-        ..., description="Condition that triggers routing"
-    )
+    target_node: str = Field(..., description="Default target node to route to")
+    trigger_condition: str = Field(..., description="Condition that triggers routing")
 
 
 class PolicyYAMLSection(BaseModel):
@@ -482,9 +481,7 @@ class PydanticSchemaSpec(BaseModel):
     class_name: str = Field(
         ..., description="Name for the Pydantic model (e.g., 'TradeDecision')"
     )
-    description: str = Field(
-        ..., description="Class docstring describing the schema"
-    )
+    description: str = Field(..., description="Class docstring describing the schema")
     fields: list[PydanticFieldSpec] = Field(
         default_factory=list, description="Fields in the schema"
     )
@@ -497,12 +494,10 @@ class PydanticSchemaSpec(BaseModel):
     enum_values: list[str] = Field(
         default_factory=list, description="Enum values if is_enum is True"
     )
-    base_class: str = Field(
-        "BaseModel", description="Base class to inherit from"
-    )
+    base_class: str = Field("BaseModel", description="Base class to inherit from")
     function_names: list[str] = Field(
         default_factory=list,
-        description="Agent function names that should use this schema for LLM output"
+        description="Agent function names that should use this schema for LLM output",
     )
 
 
@@ -538,9 +533,7 @@ class GovernanceWrapperSpec(BaseModel):
         ..., description="Instruction type to apply"
     )
     core: CoreType = Field(..., description="Core the instruction belongs to")
-    description: str = Field(
-        ..., description="Docstring for the wrapper function"
-    )
+    description: str = Field(..., description="Docstring for the wrapper function")
     functions_to_wrap: list[str] = Field(
         default_factory=list, description="Function names that use this wrapper"
     )
@@ -567,9 +560,7 @@ class TransformationResult(BaseModel):
     backup_files: list[str] = Field(
         default_factory=list, description="Backup files created"
     )
-    errors: list[str] = Field(
-        default_factory=list, description="Error messages if any"
-    )
+    errors: list[str] = Field(default_factory=list, description="Error messages if any")
     warnings: list[str] = Field(
         default_factory=list, description="Warning messages if any"
     )

@@ -314,9 +314,7 @@ class InstructionClassifier:
         """
         from .schemas import INSTRUCTION_TO_CORE as SCHEMA_INSTRUCTION_TO_CORE
 
-        core = SCHEMA_INSTRUCTION_TO_CORE.get(
-            instruction_type, CoreType.COGNITIVE
-        )
+        core = SCHEMA_INSTRUCTION_TO_CORE.get(instruction_type, CoreType.COGNITIVE)
         wrapper_name = self._generate_wrapper_name(function_name, instruction_type)
 
         return NodeClassificationResult(
@@ -420,7 +418,9 @@ Provide your classification with:
             for role in analysis.agent_roles:
                 domain_context += f"- **{role.role_name}**: {role.description}\n"
                 domain_context += f"  - Functions: {', '.join(role.functions)}\n"
-                domain_context += f"  - Suggested instruction: {role.suggested_instruction.value}\n"
+                domain_context += (
+                    f"  - Suggested instruction: {role.suggested_instruction.value}\n"
+                )
 
             domain_context += "\n### Workflow Stages\n"
             for stage in analysis.workflow_stages:
@@ -434,14 +434,14 @@ Provide your classification with:
             functions_section += f"""### {i}. {func.name}{factory_marker}
 
 **File:** {func.file_path}
-**Parameters:** {', '.join(func.parameters)}
+**Parameters:** {", ".join(func.parameters)}
 
 **Docstring:**
 {func.docstring or "(no docstring)"}
 
 **Source Code:**
 ```python
-{func.source_code[:2000]}{'...(truncated)' if len(func.source_code) > 2000 else ''}
+{func.source_code[:2000]}{"...(truncated)" if len(func.source_code) > 2000 else ""}
 ```
 
 ---

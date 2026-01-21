@@ -43,7 +43,6 @@ from .parser import AgentParser
 from .policy_designer import PolicyDesigner, PolicyDesignerConfig
 from .repo_scanner import RepoScanner
 from .schema_designer import SchemaDesigner, SchemaDesignerConfig
-from .schemas import TransformConfig
 
 
 @click.group()
@@ -413,7 +412,6 @@ def transform(
         # Interactive mode
         uv run -m arbiteros_alpha.migrator transform /path/to/my-agents --interactive
     """
-    import shutil
 
     console = Console()
 
@@ -517,7 +515,9 @@ def transform(
                 table.add_row(
                     role.role_name,
                     role.suggested_instruction.value,
-                    role.description[:50] + "..." if len(role.description) > 50 else role.description,
+                    role.description[:50] + "..."
+                    if len(role.description) > 50
+                    else role.description,
                 )
 
             console.print(table)
@@ -540,10 +540,10 @@ def transform(
 
         # Filter to relevant functions (node functions or functions in graph)
         functions_to_classify = [
-            f for f in scan_result.functions
-            if f.is_factory or any(
-                n.function_name == f.name for n in scan_result.graph_nodes
-            )
+            f
+            for f in scan_result.functions
+            if f.is_factory
+            or any(n.function_name == f.name for n in scan_result.graph_nodes)
         ]
 
         # If no functions matched, use functions from agent roles
@@ -589,8 +589,10 @@ def transform(
             for c in classifications.classifications[:20]:  # Show first 20
                 conf_pct = f"{c.confidence * 100:.0f}%"
                 conf_style = (
-                    "green" if c.confidence >= 0.8
-                    else "yellow" if c.confidence >= 0.6
+                    "green"
+                    if c.confidence >= 0.8
+                    else "yellow"
+                    if c.confidence >= 0.6
                     else "red"
                 )
                 table.add_row(
@@ -603,7 +605,9 @@ def transform(
             if len(classifications.classifications) > 20:
                 table.add_row(
                     f"... and {len(classifications.classifications) - 20} more",
-                    "", "", ""
+                    "",
+                    "",
+                    "",
                 )
 
             console.print(table)
@@ -631,7 +635,9 @@ def transform(
                 TextColumn("[progress.description]{task.description}"),
                 console=console,
             ) as progress:
-                task = progress.add_task("Designing policy checkers and routers...", total=None)
+                task = progress.add_task(
+                    "Designing policy checkers and routers...", total=None
+                )
                 designer = PolicyDesigner(config=policy_config)
                 policy_design = designer.design(analysis, classifications)
                 progress.update(task, completed=True)
@@ -648,6 +654,7 @@ def transform(
             console.print()
             # Create empty policy design
             from .schemas import PolicyDesignOutput
+
             policy_design = PolicyDesignOutput(
                 checkers=[],
                 routers=[],
@@ -689,6 +696,7 @@ def transform(
             console.print()
             # Create empty schema design
             from .schemas import LLMSchemaDesignOutput
+
             schema_design = LLMSchemaDesignOutput(
                 schemas=[],
                 imports_needed=[],

@@ -24,7 +24,6 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 from .classifier import NodeClassification
 from .parser import AgentParser, ParsedAgent
 from .schemas import (
-    CoreType,
     GeneratedFile,
     GovernanceWrapperSpec,
     InstructionTypeEnum,
@@ -281,44 +280,66 @@ class CodeGenerator:
                 and not parsed_agent.has_register_compiled_graph
             ):
                 compile_adjusted = parsed_agent.compile_lineno + offset - 1
-                
+
                 if parsed_agent.compile_in_return:
                     # Case: return workflow.compile()
                     # Need to: 1) change to assignment, 2) register, 3) return
                     graph_var = parsed_agent.graph_variable or "compiled_graph"
-                    
+
                     # Get the actual compile line
                     compile_line = source_lines[compile_adjusted].strip()
-                    
+
                     # Extract the compile call
                     import re
-                    match = re.search(r'return\s+(.+\.compile\([^)]*\))', compile_line)
+
+                    match = re.search(r"return\s+(.+\.compile\([^)]*\))", compile_line)
                     if match:
                         compile_call = match.group(1)
-                        
+
                         # Replace the return line with assignment
-                        indent = len(source_lines[compile_adjusted]) - len(source_lines[compile_adjusted].lstrip())
-                        source_lines[compile_adjusted] = f"{' ' * indent}{graph_var} = {compile_call}"
-                        
+                        indent = len(source_lines[compile_adjusted]) - len(
+                            source_lines[compile_adjusted].lstrip()
+                        )
+                        source_lines[compile_adjusted] = (
+                            f"{' ' * indent}{graph_var} = {compile_call}"
+                        )
+
                         # Add registration and return using dynamic get_arbiter_os()
                         source_lines.insert(compile_adjusted + 1, f"{' ' * indent}")
-                        source_lines.insert(compile_adjusted + 2, f"{' ' * indent}# Register with ArbiterOS for governance tracking")
-                        source_lines.insert(compile_adjusted + 3, f"{' ' * indent}# Use get_arbiter_os() dynamically to get the current instance")
-                        source_lines.insert(compile_adjusted + 4, f"{' ' * indent}get_arbiter_os().register_compiled_graph({graph_var})")
+                        source_lines.insert(
+                            compile_adjusted + 2,
+                            f"{' ' * indent}# Register with ArbiterOS for governance tracking",
+                        )
+                        source_lines.insert(
+                            compile_adjusted + 3,
+                            f"{' ' * indent}# Use get_arbiter_os() dynamically to get the current instance",
+                        )
+                        source_lines.insert(
+                            compile_adjusted + 4,
+                            f"{' ' * indent}get_arbiter_os().register_compiled_graph({graph_var})",
+                        )
                         source_lines.insert(compile_adjusted + 5, f"{' ' * indent}")
-                        source_lines.insert(compile_adjusted + 6, f"{' ' * indent}return {graph_var}")
-                        
-                        changes.append(f"Modified return compile() to register with ArbiterOS")
+                        source_lines.insert(
+                            compile_adjusted + 6, f"{' ' * indent}return {graph_var}"
+                        )
+
+                        changes.append(
+                            "Modified return compile() to register with ArbiterOS"
+                        )
                         offset += 6
                 else:
                     # Case: graph = builder.compile()
                     # Just add register_compiled_graph after this line using dynamic get_arbiter_os()
                     graph_var = parsed_agent.graph_variable or "graph"
-                    register_line = f"get_arbiter_os().register_compiled_graph({graph_var})"
-                    
+                    register_line = (
+                        f"get_arbiter_os().register_compiled_graph({graph_var})"
+                    )
+
                     # Insert after compile line
                     source_lines.insert(compile_adjusted + 1, register_line)
-                    changes.append(f"Added get_arbiter_os().register_compiled_graph({graph_var})")
+                    changes.append(
+                        f"Added get_arbiter_os().register_compiled_graph({graph_var})"
+                    )
                     offset += 1
 
             # Generate final source
@@ -423,40 +444,57 @@ class CodeGenerator:
             and not parsed_agent.has_register_compiled_graph
         ):
             compile_adjusted = parsed_agent.compile_lineno + offset - 1
-            
+
             if parsed_agent.compile_in_return:
                 # Case: return workflow.compile()
                 # Need to: 1) change to assignment, 2) register, 3) return
                 graph_var = parsed_agent.graph_variable or "compiled_graph"
-                
+
                 # Get the actual compile line
                 compile_line = source_lines[compile_adjusted].strip()
-                
+
                 # Extract the builder variable and method chain
                 # Pattern: return <builder>.compile(...)
                 import re
-                match = re.search(r'return\s+(.+\.compile\([^)]*\))', compile_line)
+
+                match = re.search(r"return\s+(.+\.compile\([^)]*\))", compile_line)
                 if match:
                     compile_call = match.group(1)
-                    
+
                     # Replace the return line with assignment
-                    indent = len(source_lines[compile_adjusted]) - len(source_lines[compile_adjusted].lstrip())
-                    source_lines[compile_adjusted] = f"{' ' * indent}{graph_var} = {compile_call}"
-                    
+                    indent = len(source_lines[compile_adjusted]) - len(
+                        source_lines[compile_adjusted].lstrip()
+                    )
+                    source_lines[compile_adjusted] = (
+                        f"{' ' * indent}{graph_var} = {compile_call}"
+                    )
+
                     # Add registration and return using dynamic get_arbiter_os()
                     source_lines.insert(compile_adjusted + 1, f"{' ' * indent}")
-                    source_lines.insert(compile_adjusted + 2, f"{' ' * indent}# Register with ArbiterOS for governance tracking")
-                    source_lines.insert(compile_adjusted + 3, f"{' ' * indent}# Use get_arbiter_os() dynamically to get the current instance")
-                    source_lines.insert(compile_adjusted + 4, f"{' ' * indent}get_arbiter_os().register_compiled_graph({graph_var})")
+                    source_lines.insert(
+                        compile_adjusted + 2,
+                        f"{' ' * indent}# Register with ArbiterOS for governance tracking",
+                    )
+                    source_lines.insert(
+                        compile_adjusted + 3,
+                        f"{' ' * indent}# Use get_arbiter_os() dynamically to get the current instance",
+                    )
+                    source_lines.insert(
+                        compile_adjusted + 4,
+                        f"{' ' * indent}get_arbiter_os().register_compiled_graph({graph_var})",
+                    )
                     source_lines.insert(compile_adjusted + 5, f"{' ' * indent}")
-                    source_lines.insert(compile_adjusted + 6, f"{' ' * indent}return {graph_var}")
+                    source_lines.insert(
+                        compile_adjusted + 6, f"{' ' * indent}return {graph_var}"
+                    )
                     offset += 6
             else:
                 # Case: graph = builder.compile()
                 # Just add register_compiled_graph after this line using dynamic get_arbiter_os()
                 graph_var = parsed_agent.graph_variable or "graph"
                 source_lines.insert(
-                    compile_adjusted + 1, f"get_arbiter_os().register_compiled_graph({graph_var})"
+                    compile_adjusted + 1,
+                    f"get_arbiter_os().register_compiled_graph({graph_var})",
                 )
                 offset += 1
 
@@ -613,12 +651,12 @@ class CodeGenerator:
                 # Skip if already modified
                 if str(rel_path) in modified_files:
                     continue
-                
+
                 try:
                     # Parse the file to check for compile() calls
                     parser = AgentParser()
                     parsed = parser.parse_file(py_file)
-                    
+
                     if (
                         parsed.agent_type == "langgraph"
                         and parsed.compile_lineno
@@ -628,60 +666,91 @@ class CodeGenerator:
                         # This file has a compile() in return statement but wasn't modified yet
                         content = py_file.read_text(encoding="utf-8")
                         source_lines = content.splitlines()
-                        
+
                         # Add "os = get_arbiter_os()" if not present and needed
-                        has_os_import = "get_arbiter_os" in content or "arbiter_os" in content
+                        has_os_import = (
+                            "get_arbiter_os" in content or "arbiter_os" in content
+                        )
                         offset = 0
-                        
+
                         if not has_os_import:
                             # Find end of imports
                             import_end = parsed.imports_end_lineno
-                            
+
                             # Calculate proper import path to governed_agents
                             file_parts = str(rel_path).split("/")
                             governed_parts = str(governed_path).split("/")
-                            
+
                             # Determine relative import
-                            if len(file_parts) > 1 and file_parts[0] == governed_parts[0]:
+                            if (
+                                len(file_parts) > 1
+                                and file_parts[0] == governed_parts[0]
+                            ):
                                 # Same package
                                 import_stmt = f"from {file_parts[0]}.agents.governed_agents import get_arbiter_os"
                             else:
-                                import_stmt = "from governed_agents import get_arbiter_os"
-                            
+                                import_stmt = (
+                                    "from governed_agents import get_arbiter_os"
+                                )
+
                             source_lines.insert(import_end, "")
-                            source_lines.insert(import_end + 1, f"# Import ArbiterOS governance - call get_arbiter_os() dynamically, not at module import")
+                            source_lines.insert(
+                                import_end + 1,
+                                "# Import ArbiterOS governance - call get_arbiter_os() dynamically, not at module import",
+                            )
                             source_lines.insert(import_end + 2, import_stmt)
                             # NOTE: Do NOT add "os = get_arbiter_os()" here - call it dynamically when registering
                             offset += 3
-                        
+
                         # Handle the compile in return
                         compile_adjusted = parsed.compile_lineno + offset - 1
                         graph_var = parsed.graph_variable or "compiled_graph"
-                        
+
                         compile_line = source_lines[compile_adjusted].strip()
-                        
+
                         import re
-                        match = re.search(r'return\s+(.+\.compile\([^)]*\))', compile_line)
+
+                        match = re.search(
+                            r"return\s+(.+\.compile\([^)]*\))", compile_line
+                        )
                         if match:
                             compile_call = match.group(1)
-                            
+
                             # Replace the return line with assignment
-                            indent = len(source_lines[compile_adjusted]) - len(source_lines[compile_adjusted].lstrip())
-                            source_lines[compile_adjusted] = f"{' ' * indent}{graph_var} = {compile_call}"
-                            
+                            indent = len(source_lines[compile_adjusted]) - len(
+                                source_lines[compile_adjusted].lstrip()
+                            )
+                            source_lines[compile_adjusted] = (
+                                f"{' ' * indent}{graph_var} = {compile_call}"
+                            )
+
                             # Add registration and return
                             # Use get_arbiter_os() dynamically to get the current instance
                             source_lines.insert(compile_adjusted + 1, f"{' ' * indent}")
-                            source_lines.insert(compile_adjusted + 2, f"{' ' * indent}# Register with ArbiterOS for governance tracking")
-                            source_lines.insert(compile_adjusted + 3, f"{' ' * indent}# Use get_arbiter_os() dynamically to get the current instance")
-                            source_lines.insert(compile_adjusted + 4, f"{' ' * indent}get_arbiter_os().register_compiled_graph({graph_var})")
+                            source_lines.insert(
+                                compile_adjusted + 2,
+                                f"{' ' * indent}# Register with ArbiterOS for governance tracking",
+                            )
+                            source_lines.insert(
+                                compile_adjusted + 3,
+                                f"{' ' * indent}# Use get_arbiter_os() dynamically to get the current instance",
+                            )
+                            source_lines.insert(
+                                compile_adjusted + 4,
+                                f"{' ' * indent}get_arbiter_os().register_compiled_graph({graph_var})",
+                            )
                             source_lines.insert(compile_adjusted + 5, f"{' ' * indent}")
-                            source_lines.insert(compile_adjusted + 6, f"{' ' * indent}return {graph_var}")
-                            
+                            source_lines.insert(
+                                compile_adjusted + 6,
+                                f"{' ' * indent}return {graph_var}",
+                            )
+
                             # Write back
-                            py_file.write_text("\n".join(source_lines), encoding="utf-8")
+                            py_file.write_text(
+                                "\n".join(source_lines), encoding="utf-8"
+                            )
                             modified_files.append(str(rel_path))
-                except Exception as e:
+                except Exception:
                     # Silently skip files that can't be parsed
                     pass
 
@@ -738,7 +807,9 @@ class CodeGenerator:
                 )
             )
             if not dry_run:
-                (policies_dir / "__init__.py").write_text(init_content, encoding="utf-8")
+                (policies_dir / "__init__.py").write_text(
+                    init_content, encoding="utf-8"
+                )
         except Exception as e:
             errors.append(f"Failed to generate policies/__init__.py: {e}")
 
@@ -753,7 +824,9 @@ class CodeGenerator:
                 )
             )
             if not dry_run:
-                (output_repo / "policies.yaml").write_text(yaml_content, encoding="utf-8")
+                (output_repo / "policies.yaml").write_text(
+                    yaml_content, encoding="utf-8"
+                )
         except Exception as e:
             errors.append(f"Failed to generate policies.yaml: {e}")
 
@@ -768,13 +841,17 @@ class CodeGenerator:
                 )
             )
             if not dry_run:
-                (output_repo / "llm_schemas.py").write_text(schemas_content, encoding="utf-8")
+                (output_repo / "llm_schemas.py").write_text(
+                    schemas_content, encoding="utf-8"
+                )
         except Exception as e:
             errors.append(f"Failed to generate llm_schemas.py: {e}")
 
         # Generate verification_nodes.py for high-risk operations
         try:
-            verification_content = self._generate_verification_nodes(analysis, classifications)
+            verification_content = self._generate_verification_nodes(
+                analysis, classifications
+            )
             generated_files.append(
                 GeneratedFile(
                     path="verification_nodes.py",
@@ -783,8 +860,10 @@ class CodeGenerator:
                 )
             )
             if not dry_run:
-                (output_repo / "verification_nodes.py").write_text(verification_content, encoding="utf-8")
-            
+                (output_repo / "verification_nodes.py").write_text(
+                    verification_content, encoding="utf-8"
+                )
+
             # Log high-risk nodes that were identified
             high_risk_nodes = self._identify_high_risk_nodes(classifications)
             if high_risk_nodes:
@@ -875,7 +954,9 @@ class CodeGenerator:
         else:
             # Calculate relative import
             # For simplicity, use the package structure
-            governed_module = str(governed_agents_path).replace("/", ".").replace(".py", "")
+            governed_module = (
+                str(governed_agents_path).replace("/", ".").replace(".py", "")
+            )
             # Get the package name from the directory structure
             parts = file_path.split("/")
             if len(parts) > 1:
@@ -921,7 +1002,9 @@ class CodeGenerator:
 
         # Add import for governance wrappers
         if wrapper_names:
-            import_line = f"from {import_from} import {', '.join(sorted(wrapper_names))}"
+            import_line = (
+                f"from {import_from} import {', '.join(sorted(wrapper_names))}"
+            )
             lines.insert(import_end, import_line)
             modifications.append(f"Added import: {import_line}")
             offset += 1
@@ -932,13 +1015,17 @@ class CodeGenerator:
             if func.function_name in schema_function_map:
                 schemas_needed.add(schema_function_map[func.function_name])
             # Also check nested function names (e.g., bull_node inside create_bull_researcher)
-            nested_name = func.function_name.replace("create_", "").replace("_researcher", "_node")
+            nested_name = func.function_name.replace("create_", "").replace(
+                "_researcher", "_node"
+            )
             if nested_name in schema_function_map:
                 schemas_needed.add(schema_function_map[nested_name])
 
         # Add schema imports if needed
         if schemas_needed:
-            schema_import = f"from llm_schemas import {', '.join(sorted(schemas_needed))}"
+            schema_import = (
+                f"from llm_schemas import {', '.join(sorted(schemas_needed))}"
+            )
             lines.insert(import_end + offset, schema_import)
             modifications.append(f"Added schema import: {schema_import}")
             offset += 1
@@ -965,7 +1052,9 @@ class CodeGenerator:
                         # Find nested function if this is a factory
                         nested_func = None
                         for child in node.body:
-                            if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                            if isinstance(
+                                child, (ast.FunctionDef, ast.AsyncFunctionDef)
+                            ):
                                 nested_func = child
                                 break
 
@@ -975,7 +1064,14 @@ class CodeGenerator:
                             decorator_line = nested_func.lineno - 1
                             indent = " " * (nested_func.col_offset)
                             decorator = f"{indent}@{func.wrapper_name}"
-                            decorator_insertions.append((decorator_line, decorator, func.function_name, func.wrapper_name))
+                            decorator_insertions.append(
+                                (
+                                    decorator_line,
+                                    decorator,
+                                    func.function_name,
+                                    func.wrapper_name,
+                                )
+                            )
                         break
 
         # Sort by line number in descending order so we don't mess up line numbers
@@ -994,10 +1090,12 @@ class CodeGenerator:
         modified_content = self._wire_schemas_into_llm_calls(
             content_after_decorators, functions, schema_function_map
         )
-        
+
         if modified_content != content_after_decorators:
             lines = modified_content.splitlines()
-            modifications.append("Wired schemas into LLM calls using with_structured_output()")
+            modifications.append(
+                "Wired schemas into LLM calls using with_structured_output()"
+            )
 
         if modifications and not dry_run and output_file:
             output_file.write_text("\n".join(lines), encoding="utf-8")
@@ -1028,80 +1126,88 @@ class CodeGenerator:
             Modified content with schemas wired into appropriate LLM calls.
         """
         import re
-        
+
         lines = content.splitlines()
         modified = False
-        
+
         # Build a map of nested function names to schemas
         func_to_schema = {}
         for func in functions:
             # Check factory function name
             if func.function_name in schema_function_map:
-                func_to_schema[func.function_name] = schema_function_map[func.function_name]
+                func_to_schema[func.function_name] = schema_function_map[
+                    func.function_name
+                ]
             # Also check nested function names (e.g., bull_node from create_bull_researcher)
-            nested_name = func.function_name.replace("create_", "").replace("_researcher", "_node")
+            nested_name = func.function_name.replace("create_", "").replace(
+                "_researcher", "_node"
+            )
             nested_name2 = func.function_name.replace("create_", "") + "_node"
             if nested_name in schema_function_map:
                 func_to_schema[func.function_name] = schema_function_map[nested_name]
             elif nested_name2 in schema_function_map:
                 func_to_schema[func.function_name] = schema_function_map[nested_name2]
-        
+
         if not func_to_schema:
             return content
-        
+
         # Get the schema name (assuming one schema per file for now)
         schema_name = list(func_to_schema.values())[0] if func_to_schema else None
         if not schema_name:
             return content
-        
+
         # Track which variables have structured output
         structured_vars = set()
-        
+
         # Find and modify LLM calls
         for i, line in enumerate(lines):
             stripped = line.strip()
-            
+
             # Pattern 1: chain = prompt | llm (without bind_tools)
             # We want to change to: chain = prompt | llm.with_structured_output(Schema)
-            if "chain = " in stripped and " | llm" in stripped and ".bind_tools" not in stripped:
+            if (
+                "chain = " in stripped
+                and " | llm" in stripped
+                and ".bind_tools" not in stripped
+            ):
                 if ".with_structured_output" not in stripped:
                     # Find the llm part
-                    match = re.search(r'(\|\s*llm)(?!\w)', stripped)
+                    match = re.search(r"(\|\s*llm)(?!\w)", stripped)
                     if match:
                         # Replace "| llm" with "| llm.with_structured_output(Schema)"
                         new_line = stripped.replace(
                             match.group(1),
-                            f"| llm.with_structured_output({schema_name})"
+                            f"| llm.with_structured_output({schema_name})",
                         )
                         indent = len(line) - len(line.lstrip())
                         lines[i] = " " * indent + new_line
                         modified = True
-            
+
             # Pattern 2: response = llm.invoke(prompt) or result = llm.invoke(...)
             # Change to: response = llm.with_structured_output(Schema).invoke(prompt)
             # But skip if it's part of a chain with bind_tools
-            match = re.search(r'(\w+)\s*=\s*llm\.invoke\(', stripped)
+            match = re.search(r"(\w+)\s*=\s*llm\.invoke\(", stripped)
             if match:
                 var_name = match.group(1)
                 # Check if bind_tools is nearby (look back a few lines)
                 has_bind_tools = False
-                for j in range(max(0, i-5), i):
+                for j in range(max(0, i - 5), i):
                     if ".bind_tools" in lines[j]:
                         has_bind_tools = True
                         break
-                
+
                 if not has_bind_tools and ".with_structured_output" not in stripped:
                     # Replace llm.invoke with llm.with_structured_output(Schema).invoke
                     new_line = re.sub(
-                        r'llm\.invoke\(',
-                        f'llm.with_structured_output({schema_name}).invoke(',
-                        stripped
+                        r"llm\.invoke\(",
+                        f"llm.with_structured_output({schema_name}).invoke(",
+                        stripped,
                     )
                     indent = len(line) - len(line.lstrip())
                     lines[i] = " " * indent + new_line
                     structured_vars.add(var_name)
                     modified = True
-            
+
             # Pattern 3: "messages": [result] or "messages": [response]
             # Change to: "messages": [result.to_message()]
             # Only for variables we know have structured output
@@ -1109,14 +1215,12 @@ class CodeGenerator:
                 pattern = f'"messages"\\s*:\\s*\\[{var_name}\\]'
                 if re.search(pattern, stripped):
                     new_line = re.sub(
-                        f'\\[{var_name}\\]',
-                        f'[{var_name}.to_message()]',
-                        stripped
+                        f"\\[{var_name}\\]", f"[{var_name}.to_message()]", stripped
                     )
                     indent = len(line) - len(line.lstrip())
                     lines[i] = " " * indent + new_line
                     modified = True
-        
+
         if modified:
             return "\n".join(lines)
         return content
@@ -1150,9 +1254,7 @@ class CodeGenerator:
 
         # 1. Generate governed_agents.py
         try:
-            governed_content = self._generate_governed_agents(
-                analysis, classifications
-            )
+            governed_content = self._generate_governed_agents(analysis, classifications)
             generated_files.append(
                 GeneratedFile(
                     path="governed_agents.py",
@@ -1279,7 +1381,8 @@ class CodeGenerator:
                     "instruction_type": spec.instruction_type.value,
                     "instruction_import": instr_import,
                     "role_description": f"{wrapper_name.replace('govern_', '')} functions",
-                    "function_description": spec.description or "perform their designated task",
+                    "function_description": spec.description
+                    or "perform their designated task",
                 }
             )
 
@@ -1321,7 +1424,7 @@ class CodeGenerator:
                     "value": instr.value,
                     "full_ref": INSTRUCTION_IMPORT_MAP.get(
                         instr, ("CognitiveCore", "CognitiveCore.GENERATE")
-                    )[1]
+                    )[1],
                 }
                 for instr in checker.instructions_to_track
             ]
@@ -1531,7 +1634,7 @@ class SafeRouterMixin:
             trigger_key = "confidence"  # default
             threshold = 0.7  # default
             comparison = "<"  # default
-            
+
             if "confidence" in trigger_condition.lower():
                 trigger_key = "confidence"
                 threshold = 0.7
@@ -1646,7 +1749,7 @@ class {router["class_name"]}(PolicyRouter, SafeRouterMixin):
 '''
 
         # Add a combined safety router that checks multiple conditions
-        content += f'''
+        content += '''
 
 # =============================================================================
 # Combined Safety Router
@@ -1697,14 +1800,14 @@ class CombinedSafetyRouter(PolicyRouter, SafeRouterMixin):
             return None
             
         last_item = history.entries[-1][-1]
-        output_state = last_item.output_state or {{}}
+        output_state = last_item.output_state or {}
         
         # Check confidence
         confidence = self._safe_get_value(output_state, "confidence")
         if confidence is not None and self._compare_threshold(confidence, self.confidence_threshold, "<"):
             logger.warning(
-                f"[{{self.name}}] Low confidence ({{confidence}} < {{self.confidence_threshold}}), "
-                f"routing to {{self.safe_target}}"
+                f"[{self.name}] Low confidence ({confidence} < {self.confidence_threshold}), "
+                f"routing to {self.safe_target}"
             )
             return self.safe_target
         
@@ -1712,8 +1815,8 @@ class CombinedSafetyRouter(PolicyRouter, SafeRouterMixin):
         risk_level = self._safe_get_value(output_state, "risk_level")
         if risk_level is not None and self._compare_threshold(risk_level, self.risk_threshold, ">"):
             logger.warning(
-                f"[{{self.name}}] High risk ({{risk_level}} > {{self.risk_threshold}}), "
-                f"routing to {{self.safe_target}}"
+                f"[{self.name}] High risk ({risk_level} > {self.risk_threshold}), "
+                f"routing to {self.safe_target}"
             )
             return self.safe_target
         
@@ -1721,22 +1824,22 @@ class CombinedSafetyRouter(PolicyRouter, SafeRouterMixin):
         quality_score = self._safe_get_value(output_state, "quality_score")
         if quality_score is not None and self._compare_threshold(quality_score, self.quality_threshold, "<"):
             logger.warning(
-                f"[{{self.name}}] Low quality ({{quality_score}} < {{self.quality_threshold}}), "
-                f"routing to {{self.safe_target}}"
+                f"[{self.name}] Low quality ({quality_score} < {self.quality_threshold}), "
+                f"routing to {self.safe_target}"
             )
             return self.safe_target
         
         # Check explicit flags
         if output_state.get("requires_human_review", False):
-            logger.warning(f"[{{self.name}}] requires_human_review flag set, routing to {{self.safe_target}}")
+            logger.warning(f"[{self.name}] requires_human_review flag set, routing to {self.safe_target}")
             return self.safe_target
         
         # Check for validation errors
         validation_errors = output_state.get("validation_errors", [])
         if validation_errors:
             logger.warning(
-                f"[{{self.name}}] Validation errors present: {{validation_errors}}, "
-                f"routing to {{self.safe_target}}"
+                f"[{self.name}] Validation errors present: {validation_errors}, "
+                f"routing to {self.safe_target}"
             )
             return self.safe_target
         
@@ -1876,17 +1979,19 @@ __all__ = [
                     require_approval = False
                     human_review = 0.9
 
-                high_risk_nodes.append({
-                    "function_name": c.function_name,
-                    "instruction_type": c.instruction_type.value,
-                    "core": c.core.value,
-                    "max_risk_threshold": max_risk,
-                    "min_confidence_threshold": min_confidence,
-                    "require_explicit_approval": require_approval,
-                    "human_review_threshold": human_review,
-                    "auto_approve_low_risk": 0.3,
-                    "rejected_target": "human_review",
-                })
+                high_risk_nodes.append(
+                    {
+                        "function_name": c.function_name,
+                        "instruction_type": c.instruction_type.value,
+                        "core": c.core.value,
+                        "max_risk_threshold": max_risk,
+                        "min_confidence_threshold": min_confidence,
+                        "require_explicit_approval": require_approval,
+                        "human_review_threshold": human_review,
+                        "auto_approve_low_risk": 0.3,
+                        "rejected_target": "human_review",
+                    }
+                )
 
         return high_risk_nodes
 

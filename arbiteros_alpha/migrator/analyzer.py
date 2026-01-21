@@ -12,7 +12,6 @@ from dataclasses import dataclass
 from pydantic import BaseModel
 
 from .schemas import (
-    AgentFramework,
     RepoAnalysisOutput,
     RepoScanResult,
 )
@@ -342,7 +341,11 @@ Be specific and detailed. Use the function names and structure you observe to ma
         if scan_result.graph_edges:
             lines.append("### Edges:")
             for edge in scan_result.graph_edges:
-                cond = f" [conditional: {edge.condition_function}]" if edge.is_conditional else ""
+                cond = (
+                    f" [conditional: {edge.condition_function}]"
+                    if edge.is_conditional
+                    else ""
+                )
                 lines.append(f"- {edge.source} -> {edge.target}{cond}")
         else:
             lines.append("### Edges: (none found)")
