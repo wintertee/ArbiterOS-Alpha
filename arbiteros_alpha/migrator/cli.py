@@ -34,9 +34,9 @@ from .parser import AgentParser
     "--type",
     "-t",
     "agent_type",
-    type=click.Choice(["langgraph", "vanilla", "auto"]),
+    type=click.Choice(["langgraph", "native", "auto"]),
     default="auto",
-    help="Agent type: langgraph, vanilla, or auto-detect (default: auto)",
+    help="Agent type: langgraph, native, or auto-detect (default: auto)",
 )
 @click.option(
     "--manual",
@@ -83,7 +83,7 @@ from .parser import AgentParser
 )
 def main(
     file_path: Path,
-    agent_type: Literal["langgraph", "vanilla", "auto"],
+    agent_type: Literal["langgraph", "native", "auto"],
     manual: bool,
     yes: bool,
     dry_run: bool,

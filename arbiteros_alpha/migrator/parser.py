@@ -2,7 +2,7 @@
 
 This module provides tools to parse Python source files and identify:
 - LangGraph-based agents (StateGraph, add_node, add_edge, compile patterns)
-- Vanilla agents (regular Python functions)
+- native agents (regular Python functions)
 - Function definitions with their docstrings and source code
 """
 
@@ -40,7 +40,7 @@ class ParsedAgent:
     """Parsed agent structure from source code.
 
     Attributes:
-        agent_type: Either "langgraph" or "vanilla".
+        agent_type: Either "langgraph" or "native".
         functions: List of parsed functions found in the file.
         compile_lineno: Line number where compile() is called (LangGraph only).
         graph_variable: Variable name holding the compiled graph.
@@ -50,7 +50,7 @@ class ParsedAgent:
         has_existing_arbiteros: True if file already has ArbiterOS imports.
     """
 
-    agent_type: Literal["langgraph", "vanilla"]
+    agent_type: Literal["langgraph", "native"]
     functions: list[ParsedFunction]
     compile_lineno: int | None = None
     graph_variable: str | None = None
@@ -64,7 +64,7 @@ class AgentParser:
     """Parser for extracting agent information from Python source files.
 
     This parser uses Python's AST module to analyze source files and detect:
-    - Whether the agent uses LangGraph or is a vanilla Python agent
+    - Whether the agent uses LangGraph or is a native Python agent
     - All function definitions that could be node functions
     - The location of the compile() call for LangGraph agents
     - Import statements and their locations
@@ -72,7 +72,7 @@ class AgentParser:
     Example:
         >>> parser = AgentParser()
         >>> result = parser.parse_file("my_agent.py")
-        >>> print(result.agent_type)  # "langgraph" or "vanilla"
+        >>> print(result.agent_type)  # "langgraph" or "native"
         >>> for func in result.functions:
         ...     print(f"{func.name}: {func.docstring}")
     """
@@ -117,7 +117,7 @@ class AgentParser:
         tree = ast.parse(source_code)
 
         # Detect agent type and collect metadata
-        agent_type: Literal["langgraph", "vanilla"] = "vanilla"
+        agent_type: Literal["langgraph", "native"] = "native"
         compile_lineno: int | None = None
         graph_variable: str | None = None
         builder_variable: str | None = None
@@ -180,8 +180,8 @@ class AgentParser:
                 func = self._extract_function(node, source_code)
                 func.is_node_function = func.name in self._node_function_names
 
-                # For vanilla agents, consider all functions with state param as node functions
-                if agent_type == "vanilla" and func.has_state_param:
+                # For native agents, consider all functions with state param as node functions
+                if agent_type == "native" and func.has_state_param:
                     func.is_node_function = True
 
                 functions.append(func)
