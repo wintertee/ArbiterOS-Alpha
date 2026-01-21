@@ -350,7 +350,7 @@ class ArbiterOSAlpha:
                     logger.info(f"--- Rollout Completed: {func.__name__} ---")
                     return result
                 except Exception:
-                    logger.error(f"--- Rollout Failed: {func.__name__} ---")
+                    logger.error(f"--- Rollout Failed: {func.__name__} ---", exc_info=True)
                     raise
                 finally:
                     self._in_rollout = False
