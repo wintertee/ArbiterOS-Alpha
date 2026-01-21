@@ -11,25 +11,24 @@ import logging
 import weakref
 from typing import Any, Callable, Literal
 
+from langfuse import Langfuse
 from langgraph.pregel import Pregel, _loop
 from langgraph.types import Command
 
 from .evaluation import EvaluationResult, NodeEvaluator
 from .history import History, HistoryItem
 from .instructions import (
-    InstructionType,
-    CognitiveCore,
-    MemoryCore,
-    ExecutionCore,
-    NormativeCore,
-    MetacognitiveCore,
     AdaptiveCore,
-    SocialCore,
     AffectiveCore,
+    CognitiveCore,
+    ExecutionCore,
+    InstructionType,
+    MemoryCore,
+    MetacognitiveCore,
+    NormativeCore,
+    SocialCore,
 )
 from .policy import PolicyChecker, PolicyRouter
-
-from langfuse import Langfuse
 
 logger = logging.getLogger(__name__)
 
@@ -101,12 +100,7 @@ class ArbiterOSAlpha:
             self._patch_pregel_loop()
 
         self.langfuse = Langfuse()
-        self.span = self.langfuse.start_span(name="arbiteros_alpha_record")
-
-    def __del__(self):
-        """Flushes all buffered data and ends the main span."""
-        self.span.end()
-        self.langfuse.flush()
+        self.span = None
 
     def add_policy_checker(self, checker: PolicyChecker) -> None:
         """Register a policy checker for validation.
@@ -403,6 +397,7 @@ class ArbiterOSAlpha:
 
                 # Initialize a fresh history for this new rollout
                 self.history = History()
+                self.span = self.langfuse.start_span(name="arbiteros_alpha_record")
                 self._in_rollout = True
                 logger.info(f"--- Starting Rollout: {func.__name__} ---")
 
@@ -416,6 +411,8 @@ class ArbiterOSAlpha:
                     )
                     raise
                 finally:
+                    self.span.end()
+                    self.langfuse.flush()
                     self._in_rollout = False
 
             return wrapper
