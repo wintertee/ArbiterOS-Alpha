@@ -56,7 +56,7 @@ class History:
                 "All nodes for the current superstep have already recorded entries.\n"
                 "Hint: Did you forget to call \n"
                 "    - register_compiled_graph() for langgraph backend or \n"
-                "    - enter_next_superstep() for vanilla backend?"
+                "    - enter_next_superstep() for native backend?"
             )
         self.entries[-1].append(entry)
 

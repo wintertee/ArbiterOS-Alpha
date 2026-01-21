@@ -252,8 +252,12 @@ class TestArbiterOSAlpha:
             return {"result": "success"}
 
         # Act
-        os.history.enter_next_superstep(["test_func"])
-        result = test_func({"input": "data"})
+        @os.rollout()
+        def run_test():
+            os.history.enter_next_superstep(["test_func"])
+            return test_func({"input": "data"})
+
+        result = run_test()
 
         # Assert
         assert len(os.history.entries) == 1
@@ -293,10 +297,14 @@ class TestArbiterOSAlpha:
             return {"step": "b"}
 
         # Act
-        os.history.enter_next_superstep(["func_a"])
-        func_a({})
-        os.history.enter_next_superstep(["func_b"])
-        func_b({})
+        @os.rollout()
+        def run_test():
+            os.history.enter_next_superstep(["func_a"])
+            func_a({})
+            os.history.enter_next_superstep(["func_b"])
+            func_b({})
+
+        run_test()
 
         # Assert
         assert len(os.history.entries) == 2
@@ -316,8 +324,12 @@ class TestArbiterOSAlpha:
             return {"confidence": 0.3}
 
         # Act
-        os.history.enter_next_superstep(["evaluate"])
-        result = evaluate({})
+        @os.rollout()
+        def run_test():
+            os.history.enter_next_superstep(["evaluate"])
+            return evaluate({})
+
+        result = run_test()
 
         # Assert
         from langgraph.types import Command
@@ -340,8 +352,12 @@ class TestArbiterOSAlpha:
             return {"confidence": 0.8}
 
         # Act
-        os.history.enter_next_superstep(["evaluate"])
-        result = evaluate({})
+        @os.rollout()
+        def run_test():
+            os.history.enter_next_superstep(["evaluate"])
+            return evaluate({})
+
+        result = run_test()
 
         # Assert
         assert result == {"confidence": 0.8}
@@ -359,8 +375,12 @@ class TestArbiterOSAlpha:
         before_time = datetime.datetime.now()
 
         # Act
-        os.history.enter_next_superstep(["test_func"])
-        test_func({})
+        @os.rollout()
+        def run_test():
+            os.history.enter_next_superstep(["test_func"])
+            test_func({})
+
+        run_test()
 
         after_time = datetime.datetime.now()
 
@@ -387,12 +407,16 @@ class TestArbiterOSAlpha:
             return {"step": 3}
 
         # Act
-        os.history.enter_next_superstep(["first"])
-        first({})
-        os.history.enter_next_superstep(["second"])
-        second({})
-        os.history.enter_next_superstep(["third"])
-        third({})
+        @os.rollout()
+        def run_test():
+            os.history.enter_next_superstep(["first"])
+            first({})
+            os.history.enter_next_superstep(["second"])
+            second({})
+            os.history.enter_next_superstep(["third"])
+            third({})
+
+        run_test()
 
         # Assert
         assert len(os.history.entries) == 3
