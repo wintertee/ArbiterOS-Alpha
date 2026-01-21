@@ -102,6 +102,7 @@ arbiter_os.register_compiled_graph(graph)
 # 3. Run graph
 
 
+@arbiter_os.rollout()
 def main():
     initial_state: State = {
         "query": "What is AI?",
