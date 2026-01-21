@@ -55,15 +55,30 @@ class ArbiterOSAlpha:
         ```
     """
 
-    def __init__(self, backend: Literal["langgraph", "vanilla"] = "langgraph"):
+    def __init__(
+        self, backend: Literal["langgraph", "native", "vanilla"] = "langgraph"
+    ):
         """Initialize the ArbiterOSAlpha instance.
 
         Args:
             backend: The execution backend to use.
                 - "langgraph": Use an agent based on the LangGraph framework.
-                - "vanilla": Use the framework-less ('from scratch') agent implementation.
+                - "native": Use the framework-less ('from scratch') agent implementation.
+                - "vanilla": (Deprecated) Alias for "native".
         """
-        self.backend = backend
+        if backend == "vanilla":
+            import warnings
+
+            warnings.warn(
+                "The 'vanilla' backend is deprecated and will be removed in a future version. "
+                "Please use 'native' instead.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            self.backend = "native"
+        else:
+            self.backend = backend
+
         self.history: History = History()
         self.policy_checkers: list[PolicyChecker] = []
         self.policy_routers: list[PolicyRouter] = []
@@ -254,8 +269,8 @@ class ArbiterOSAlpha:
 
                 # Capture input state from arguments
                 input_state = None
-                if self.backend == "vanilla":
-                    # For vanilla backend, capture all named arguments
+                if self.backend == "native":
+                    # For native backend, capture all named arguments
                     sig = inspect.signature(func)
                     bound_args = sig.bind(*args, **kwargs)
                     bound_args.apply_defaults()
@@ -270,7 +285,7 @@ class ArbiterOSAlpha:
                     input_state=input_state,
                 )
 
-                if self.backend == "vanilla":
+                if self.backend == "native":
                     self.history.enter_next_superstep([instruction_type.name])
 
                 self.history.add_entry(history_item)
@@ -291,6 +306,42 @@ class ArbiterOSAlpha:
                     return Command(update=result, goto=destination)
 
                 return result
+
+            return wrapper
+
+        return decorator
+
+    def rollout(self) -> Callable[[Callable], Callable]:
+        """Decorator to delimit a complete execution workflow (a 'rollout').
+
+        This decorator manages the lifecycle of a single execution trace.
+        By abandoning the concept of a session ID, this decorator treats every
+        invocation as a fresh, independent interaction.
+
+        It automatically:
+        1. Resets the execution history to ensure a clean state.
+        2. Logs the start and end of the rollout.
+
+        Usage:
+            @os.rollout()
+            def run_agent(input_data):
+                ...
+        """
+
+        def decorator(func: Callable) -> Callable:
+            @functools.wraps(func)
+            def wrapper(*args, **kwargs) -> Any:
+                # Initialize a fresh history for this new rollout
+                self.history = History()
+                logger.info(f"--- Starting Rollout: {func.__name__} ---")
+
+                try:
+                    result = func(*args, **kwargs)
+                    logger.info(f"--- Rollout Completed: {func.__name__} ---")
+                    return result
+                except Exception:
+                    logger.error(f"--- Rollout Failed: {func.__name__} ---")
+                    raise
 
             return wrapper
 

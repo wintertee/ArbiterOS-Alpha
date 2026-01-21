@@ -56,8 +56,8 @@ graph = builder.compile()
 
 
 @pytest.fixture
-def sample_vanilla_source():
-    """Provide sample vanilla agent source code."""
+def sample_native_source():
+    """Provide sample native agent source code."""
     return """from typing import TypedDict
 
 class State(TypedDict):
@@ -130,12 +130,12 @@ class TestAgentParser:
         assert result.graph_variable == "graph"
         assert result.compile_lineno is not None
 
-    def test_parse_source_detects_vanilla_agent(self, sample_vanilla_source):
-        """Test that vanilla agents are correctly detected."""
+    def test_parse_source_detects_native_agent(self, sample_native_source):
+        """Test that native agents are correctly detected."""
         parser = AgentParser()
-        result = parser.parse_source(sample_vanilla_source)
+        result = parser.parse_source(sample_native_source)
 
-        assert result.agent_type == "vanilla"
+        assert result.agent_type == "native"
         assert result.compile_lineno is None
 
     def test_parse_source_extracts_functions(self, sample_langgraph_source):
@@ -201,7 +201,7 @@ class TestAgentParser:
         parser = AgentParser()
         result = parser.parse_source("")
 
-        assert result.agent_type == "vanilla"
+        assert result.agent_type == "native"
         assert len(result.functions) == 0
 
 

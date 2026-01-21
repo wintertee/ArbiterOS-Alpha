@@ -15,7 +15,7 @@ from arbiteros_alpha import ArbiterOSAlpha, ThresholdEvaluator
 from arbiteros_alpha.instructions import CognitiveCore, NormativeCore
 
 # Initialize ArbiterOS
-arbiter_os = ArbiterOSAlpha(backend="vanilla")
+arbiter_os = ArbiterOSAlpha(backend="native")
 
 # Create a GENERATE node
 @arbiter_os.instruction(CognitiveCore.GENERATE)
@@ -171,7 +171,7 @@ Demonstrate evaluator filtering with GENERATE and VERIFY nodes:
 from arbiteros_alpha import ArbiterOSAlpha, ThresholdEvaluator
 from arbiteros_alpha.instructions import CognitiveCore, NormativeCore
 
-arbiter_os = ArbiterOSAlpha(backend="vanilla")
+arbiter_os = ArbiterOSAlpha(backend="native")
 
 # GENERATE node: produces response and confidence
 @arbiter_os.instruction(CognitiveCore.GENERATE)

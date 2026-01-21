@@ -83,7 +83,7 @@ class TestThresholdEvaluator:
             name="confidence_check", key="confidence", threshold=0.7
         )
 
-        arbiter_os = ArbiterOSAlpha(backend="vanilla")
+        arbiter_os = ArbiterOSAlpha(backend="native")
 
         @arbiter_os.instruction(CognitiveCore.GENERATE)
         def generate(state):
@@ -105,7 +105,7 @@ class TestThresholdEvaluator:
             name="confidence_check", key="confidence", threshold=0.7
         )
 
-        arbiter_os = ArbiterOSAlpha(backend="vanilla")
+        arbiter_os = ArbiterOSAlpha(backend="native")
 
         @arbiter_os.instruction(CognitiveCore.GENERATE)
         def generate(state):
@@ -126,7 +126,7 @@ class TestThresholdEvaluator:
             name="confidence_check", key="confidence", threshold=0.7
         )
 
-        arbiter_os = ArbiterOSAlpha(backend="vanilla")
+        arbiter_os = ArbiterOSAlpha(backend="native")
 
         @arbiter_os.instruction(CognitiveCore.GENERATE)
         def generate(state):
@@ -146,7 +146,7 @@ class TestArbiterOSEvaluatorIntegration:
 
     def test_add_evaluator(self):
         """Test adding an evaluator to ArbiterOSAlpha."""
-        arbiter_os = ArbiterOSAlpha(backend="vanilla")
+        arbiter_os = ArbiterOSAlpha(backend="native")
         evaluator = ThresholdEvaluator(name="test", key="score", threshold=0.5)
 
         arbiter_os.add_evaluator(evaluator)
@@ -156,7 +156,7 @@ class TestArbiterOSEvaluatorIntegration:
 
     def test_evaluator_runs_on_instruction_execution(self):
         """Test that evaluators run when instructions execute."""
-        arbiter_os = ArbiterOSAlpha(backend="vanilla")
+        arbiter_os = ArbiterOSAlpha(backend="native")
         evaluator = ThresholdEvaluator(
             name="quality_check", key="quality", threshold=0.6
         )
@@ -178,7 +178,7 @@ class TestArbiterOSEvaluatorIntegration:
 
     def test_multiple_evaluators_run_independently(self):
         """Test that multiple evaluators run independently."""
-        arbiter_os = ArbiterOSAlpha(backend="vanilla")
+        arbiter_os = ArbiterOSAlpha(backend="native")
 
         eval1 = ThresholdEvaluator(name="eval1", key="metric1", threshold=0.5)
         eval2 = ThresholdEvaluator(name="eval2", key="metric2", threshold=0.7)
@@ -205,7 +205,7 @@ class TestArbiterOSEvaluatorIntegration:
             def evaluate(self, history: History) -> EvaluationResult:
                 raise RuntimeError("Evaluator failed!")
 
-        arbiter_os = ArbiterOSAlpha(backend="vanilla")
+        arbiter_os = ArbiterOSAlpha(backend="native")
         arbiter_os.add_evaluator(BrokenEvaluator(name="broken"))
 
         @arbiter_os.instruction(CognitiveCore.GENERATE)
@@ -234,7 +234,7 @@ class TestArbiterOSEvaluatorIntegration:
                     feedback=f"Total executions: {total_items}",
                 )
 
-        arbiter_os = ArbiterOSAlpha(backend="vanilla")
+        arbiter_os = ArbiterOSAlpha(backend="native")
         arbiter_os.add_evaluator(HistoryAwareEvaluator(name="history_check"))
 
         @arbiter_os.instruction(CognitiveCore.GENERATE)
@@ -280,7 +280,7 @@ class TestEvaluatorFiltering:
                 evaluated_instructions.append(current.instruction)
                 return EvaluationResult(score=1.0, passed=True, feedback="evaluated")
 
-        arbiter_os = ArbiterOSAlpha(backend="vanilla")
+        arbiter_os = ArbiterOSAlpha(backend="native")
         # Only evaluate GENERATE nodes
         arbiter_os.add_evaluator(
             TrackingEvaluator(
@@ -315,7 +315,7 @@ class TestEvaluatorFiltering:
                 evaluated_count[0] += 1
                 return EvaluationResult(score=1.0, passed=True, feedback="evaluated")
 
-        arbiter_os = ArbiterOSAlpha(backend="vanilla")
+        arbiter_os = ArbiterOSAlpha(backend="native")
         # No target_instructions = evaluate everything
         arbiter_os.add_evaluator(UnfilteredEvaluator(name="unfiltered"))
 
@@ -346,7 +346,7 @@ class TestEvaluatorFiltering:
                 evaluated_instructions.append(current.instruction)
                 return EvaluationResult(score=1.0, passed=True, feedback="evaluated")
 
-        arbiter_os = ArbiterOSAlpha(backend="vanilla")
+        arbiter_os = ArbiterOSAlpha(backend="native")
         # Target both GENERATE and REFLECT
         arbiter_os.add_evaluator(
             MultiTargetEvaluator(

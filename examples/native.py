@@ -16,7 +16,7 @@ logging.basicConfig(
 
 # 1. Setup OS
 
-arbiter_os = ArbiterOSAlpha(backend="vanilla")
+arbiter_os = ArbiterOSAlpha(backend="native")
 
 # Policy: Prevent direct generate->toolcall without proper flow
 history_checker = HistoryPolicyChecker(
@@ -57,9 +57,9 @@ def evaluate(response: str, criteria: list[str]) -> float:
     return confidence
 
 
+@arbiter_os.rollout()
 def main():
     # 3. Run instructions
-
     query = "What is AI?"
     tool_result = ""
     confidence = 0.0

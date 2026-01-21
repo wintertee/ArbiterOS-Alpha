@@ -1,6 +1,6 @@
 """ArbiterOS Migrator: Migration tool for converting agents to ArbiterOS-governed agents.
 
-This module provides tools to migrate existing LangGraph or vanilla Python agents
+This module provides tools to migrate existing LangGraph or native Python agents
 into ArbiterOS-governed agents with automatic instruction type classification.
 """
 
