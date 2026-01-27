@@ -64,15 +64,12 @@ class HistoryPolicyChecker(PolicyChecker):
     by maintaining a blacklist of forbidden instruction chains.
 
     Example:
-        ```python
-        from arbiteros_alpha.instructions import CognitiveCore, ExecutionCore
-
-        checker = HistoryPolicyChecker(
-            "no_direct_toolcall",
-            [CognitiveCore.GENERATE, ExecutionCore.TOOL_CALL]
-        )
-        # This will raise RuntimeError if GENERATE is followed by TOOL_CALL
-        ```
+        >>> from arbiteros_alpha.instructions import CognitiveCore, ExecutionCore
+        >>> checker = HistoryPolicyChecker(
+        ...     "no_direct_toolcall",
+        ...     [CognitiveCore.GENERATE, ExecutionCore.TOOL_CALL]
+        ... )
+        >>> # This will raise RuntimeError if GENERATE is followed by TOOL_CALL
     """
 
     name: str
@@ -154,15 +151,13 @@ class MetricThresholdPolicyRouter(PolicyRouter):
     Example:
         Create a router that triggers regeneration when confidence is low:
 
-        ```python
-        router = MetricThresholdPolicyRouter(
-            name="regenerate_on_low_confidence",
-            key="confidence",
-            threshold=0.6,
-            target="generate"
-        )
-        # If output["confidence"] < 0.6, routes back to "generate" node
-        ```
+        >>> router = MetricThresholdPolicyRouter(
+        ...     name="regenerate_on_low_confidence",
+        ...     key="confidence",
+        ...     threshold=0.6,
+        ...     target="generate"
+        ... )
+        >>> # If output["confidence"] < 0.6, routes back to "generate" node
     """
 
     name: str
@@ -193,3 +188,256 @@ class MetricThresholdPolicyRouter(PolicyRouter):
         if confidence < self.threshold:
             return self.target
         return None
+
+
+# =============================================================================
+# Human-in-the-Loop Policies
+# =============================================================================
+
+
+class HumanInterruptRequest(Exception):
+    """Exception raised when human intervention is required.
+
+    This exception signals that the workflow should pause and wait for
+    human input before proceeding. It contains all necessary context
+    for the human reviewer.
+
+    Attributes:
+        policy_name: Name of the policy that triggered the interrupt.
+        reason: Human-readable reason for the interrupt.
+        context: Additional context for the human reviewer.
+        required_actions: List of actions the human must take.
+        timeout_seconds: How long to wait for human response (None = indefinite).
+    """
+
+    def __init__(
+        self,
+        policy_name: str,
+        reason: str,
+        context: dict = None,
+        required_actions: list[str] = None,
+        timeout_seconds: int | None = None,
+    ):
+        self.policy_name = policy_name
+        self.reason = reason
+        self.context = context or {}
+        self.required_actions = required_actions or ["approve", "reject", "modify"]
+        self.timeout_seconds = timeout_seconds
+        super().__init__(f"[{policy_name}] Human intervention required: {reason}")
+
+
+@dataclass
+class HumanInterruptPolicyChecker(PolicyChecker):
+    """Policy checker that requires human approval for critical decisions.
+
+    This checker pauses execution and requests human intervention when
+    specified conditions are met. It's designed for high-stakes operations
+    where automated decisions are insufficient.
+
+    Attributes:
+        name: Human-readable name for this policy checker.
+        trigger_on_high_risk: Interrupt when risk_level > risk_threshold.
+        trigger_on_low_confidence: Interrupt when confidence < confidence_threshold.
+        trigger_on_first_execution: Interrupt on first execution of a type.
+        risk_threshold: Risk level that triggers interrupt (default: 0.85).
+        confidence_threshold: Confidence below which to interrupt (default: 0.4).
+        instructions_requiring_approval: Instruction types that always need approval.
+
+    Example:
+        >>> checker = HumanInterruptPolicyChecker(
+        ...     name="require_human_for_trades",
+        ...     trigger_on_high_risk=True,
+        ...     risk_threshold=0.8,
+        ...     instructions_requiring_approval=[ExecutionCore.TOOL_CALL]
+        ... )
+        >>> arbiter_os.add_policy_checker(checker)
+    """
+
+    name: str
+    trigger_on_high_risk: bool = True
+    trigger_on_low_confidence: bool = True
+    trigger_on_first_execution: bool = False
+    risk_threshold: float = 0.85
+    confidence_threshold: float = 0.4
+    instructions_requiring_approval: list[InstructionType] = None
+
+    def __post_init__(self):
+        if self.instructions_requiring_approval is None:
+            self.instructions_requiring_approval = []
+
+    def check_before(self, history: History) -> bool:
+        """Check if human intervention is required before proceeding.
+
+        Evaluates multiple conditions to determine if the workflow should
+        pause for human review:
+        1. High risk level in recent outputs
+        2. Low confidence in recent outputs
+        3. Instruction type requires explicit approval
+        4. First-time execution of certain instruction types
+
+        Args:
+            history: The execution history up to this point.
+
+        Returns:
+            True if no human intervention needed.
+
+        Raises:
+            HumanInterruptRequest: When human intervention is required.
+        """
+        if not history.entries:
+            return True
+
+        last_superstep = history.entries[-1]
+        if not last_superstep:
+            return True
+
+        last_item = last_superstep[-1]
+        output_state = last_item.output_state or {}
+        instruction = last_item.instruction
+
+        # Check instruction type requiring approval
+        if instruction in self.instructions_requiring_approval:
+            raise HumanInterruptRequest(
+                policy_name=self.name,
+                reason=f"Instruction {instruction.name} requires human approval",
+                context={
+                    "instruction": instruction.name,
+                    "input_state": last_item.input_state,
+                    "output_state": output_state,
+                },
+                required_actions=["approve", "reject"],
+            )
+
+        # Check high risk
+        if self.trigger_on_high_risk:
+            risk_level = output_state.get("risk_level")
+            if risk_level is not None and risk_level > self.risk_threshold:
+                raise HumanInterruptRequest(
+                    policy_name=self.name,
+                    reason=f"High risk detected: {risk_level:.2f} > {self.risk_threshold}",
+                    context={
+                        "risk_level": risk_level,
+                        "threshold": self.risk_threshold,
+                        "output_state": output_state,
+                    },
+                    required_actions=["approve", "reject", "adjust_parameters"],
+                )
+
+        # Check low confidence
+        if self.trigger_on_low_confidence:
+            confidence = output_state.get("confidence")
+            if confidence is not None and confidence < self.confidence_threshold:
+                raise HumanInterruptRequest(
+                    policy_name=self.name,
+                    reason=f"Low confidence: {confidence:.2f} < {self.confidence_threshold}",
+                    context={
+                        "confidence": confidence,
+                        "threshold": self.confidence_threshold,
+                        "output_state": output_state,
+                    },
+                    required_actions=["approve", "reject", "request_retry"],
+                )
+
+        # Check first execution
+        if self.trigger_on_first_execution:
+            instruction_count = 0
+            for superstep in history.entries:
+                for item in superstep:
+                    if item.instruction == instruction:
+                        instruction_count += 1
+
+            if instruction_count <= 1:
+                raise HumanInterruptRequest(
+                    policy_name=self.name,
+                    reason=f"First execution of {instruction.name} requires review",
+                    context={
+                        "instruction": instruction.name,
+                        "execution_count": instruction_count,
+                    },
+                    required_actions=["approve", "reject"],
+                )
+
+        return True
+
+
+@dataclass
+class VerificationRequirementChecker(PolicyChecker):
+    """Policy checker that requires verification before high-risk operations.
+
+    This checker ensures that a VERIFY instruction has been executed
+    before allowing high-risk operations (like TOOL_CALL) to proceed.
+
+    Attributes:
+        name: Human-readable name for this checker.
+        target_instructions: Instructions that require verification.
+        verification_instruction: The instruction type that provides verification.
+        min_verifications: Minimum number of verifications required.
+        strict_mode: If True, raises error instead of returning False.
+
+    Example:
+        >>> from arbiteros_alpha.instructions import ExecutionCore, NormativeCore
+        >>> checker = VerificationRequirementChecker(
+        ...     name="verify_before_tool_call",
+        ...     target_instructions=[ExecutionCore.TOOL_CALL],
+        ...     verification_instruction=NormativeCore.VERIFY,
+        ...     min_verifications=1
+        ... )
+        >>> arbiter_os.add_policy_checker(checker)
+    """
+
+    name: str
+    target_instructions: list[InstructionType] = None
+    verification_instruction: InstructionType = None
+    min_verifications: int = 1
+    strict_mode: bool = True
+
+    def __post_init__(self):
+        if self.target_instructions is None:
+            self.target_instructions = []
+
+    def check_before(self, history: History) -> bool:
+        """Check that verification has been performed before target instructions.
+
+        Counts VERIFY instructions and ensures the required minimum have
+        been executed before allowing target instructions to proceed.
+
+        Args:
+            history: The execution history.
+
+        Returns:
+            True if sufficient verification has been performed.
+
+        Raises:
+            RuntimeError: In strict_mode when verification is insufficient.
+        """
+        if not history.entries:
+            return True
+
+        # Count verifications
+        verification_count = 0
+        for superstep in history.entries:
+            for item in superstep:
+                if (
+                    self.verification_instruction is not None
+                    and item.instruction == self.verification_instruction
+                ):
+                    verification_count += 1
+
+        # Check if current instruction requires verification
+        last_superstep = history.entries[-1]
+        if last_superstep:
+            last_instruction = last_superstep[-1].instruction
+            if last_instruction in self.target_instructions:
+                if verification_count < self.min_verifications:
+                    error_msg = (
+                        f"Instruction {last_instruction.name} requires "
+                        f"{self.min_verifications} verification(s), "
+                        f"found {verification_count}"
+                    )
+                    logger.warning(f"[{self.name}] {error_msg}")
+
+                    if self.strict_mode:
+                        raise RuntimeError(f"[{self.name}] {error_msg}")
+                    return False
+
+        return True
