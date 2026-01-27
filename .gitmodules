@@ -1,0 +1,3 @@
+[submodule "examples/TradingAgents"]
+	path = examples/TradingAgents
+	url = https://github.com/ChangranXU/TradingAgents
