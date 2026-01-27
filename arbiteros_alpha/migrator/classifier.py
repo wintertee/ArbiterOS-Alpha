@@ -2,14 +2,31 @@
 
 This module provides automatic classification of function nodes into
 ArbiterOS instruction types using LLM inference with structured output.
+
+Enhanced features:
+- Domain-aware classification using analyzer context
+- Batch classification with JSON schema validation
+- Support for factory function patterns
+- Wrapper name generation
 """
 
+import logging
 import os
 from dataclasses import dataclass
 
 from pydantic import BaseModel, Field
 
 from .parser import ParsedFunction
+from .schemas import (
+    CoreType,
+    FunctionInfo,
+    InstructionTypeEnum,
+    NodeClassificationBatch,
+    NodeClassificationResult,
+    RepoAnalysisOutput,
+)
+
+logger = logging.getLogger(__name__)
 
 
 # All instruction types organized by core
@@ -77,6 +94,7 @@ class NodeClassification(BaseModel):
     """Classification result for a single node function.
 
     This is used as a structured output schema for LLM classification.
+    Legacy schema for backward compatibility with single-function classification.
     """
 
     instruction_type: str = Field(
@@ -123,10 +141,23 @@ class InstructionClassifier:
     Uses LangChain with structured output to classify functions based on
     their name, docstring, and source code.
 
+    Enhanced with:
+    - Domain context awareness from RepoAnalysisOutput
+    - Batch classification with validated JSON output
+    - Factory function pattern support
+    - Automatic wrapper name generation
+
     Example:
         >>> classifier = InstructionClassifier()
         >>> result = classifier.classify(parsed_function)
         >>> print(f"{result.instruction_type} ({result.confidence})")
+
+        # With domain context
+        >>> batch_result = classifier.classify_batch_with_context(
+        ...     functions, analysis_output
+        ... )
+        >>> for r in batch_result.classifications:
+        ...     print(f"{r.function_name} -> {r.instruction_type}")
     """
 
     def __init__(self, config: ClassificationConfig | None = None) -> None:
@@ -162,6 +193,26 @@ class InstructionClassifier:
 
         return self._llm
 
+    def _invoke_structured(
+        self, prompt: str, output_schema: type[BaseModel]
+    ) -> BaseModel:
+        """Invoke LLM with structured JSON output.
+
+        Args:
+            prompt: The prompt to send to the LLM.
+            output_schema: Pydantic model for structured output.
+
+        Returns:
+            Parsed and validated Pydantic model instance.
+        """
+        llm = self._get_llm()
+        # Use function_calling method for more flexible schemas
+        structured_llm = llm.with_structured_output(
+            output_schema, method="function_calling"
+        )
+        result = structured_llm.invoke(prompt)
+        return result
+
     def classify(self, function: ParsedFunction) -> NodeClassification:
         """Classify a single function into an instruction type.
 
@@ -176,8 +227,10 @@ class InstructionClassifier:
         # Build the prompt
         prompt = self._build_classification_prompt(function)
 
-        # Use structured output
-        structured_llm = llm.with_structured_output(NodeClassification)
+        # Use structured output with function_calling method
+        structured_llm = llm.with_structured_output(
+            NodeClassification, method="function_calling"
+        )
 
         result = structured_llm.invoke(prompt)
         return result
@@ -185,7 +238,7 @@ class InstructionClassifier:
     def classify_batch(
         self, functions: list[ParsedFunction]
     ) -> list[NodeClassification]:
-        """Classify multiple functions.
+        """Classify multiple functions (sequential).
 
         Args:
             functions: List of parsed functions to classify.
@@ -194,6 +247,32 @@ class InstructionClassifier:
             List of classifications in the same order as input.
         """
         return [self.classify(func) for func in functions]
+
+    def classify_batch_with_context(
+        self,
+        functions: list[FunctionInfo],
+        analysis: RepoAnalysisOutput | None = None,
+    ) -> NodeClassificationBatch:
+        """Classify multiple functions with domain context in a single LLM call.
+
+        This method uses the domain analysis to provide better context for
+        classification, resulting in more accurate instruction type assignments.
+        All functions are classified in a single batch call for efficiency.
+
+        Args:
+            functions: List of FunctionInfo objects from repo scan.
+            analysis: Optional RepoAnalysisOutput providing domain context.
+
+        Returns:
+            NodeClassificationBatch with all classifications.
+        """
+        logger.info(f"Batch classifying {len(functions)} functions")
+
+        prompt = self._build_batch_classification_prompt(functions, analysis)
+        result = self._invoke_structured(prompt, NodeClassificationBatch)
+
+        logger.info(f"Classified {len(result.classifications)} functions")
+        return result
 
     def classify_manual(
         self, function: ParsedFunction, instruction_type: str
@@ -213,6 +292,40 @@ class InstructionClassifier:
             core=core,
             confidence=1.0,
             reasoning="Manually selected by user",
+        )
+
+    def classify_manual_batch(
+        self,
+        function_name: str,
+        file_path: str,
+        instruction_type: InstructionTypeEnum,
+        is_factory: bool = False,
+    ) -> NodeClassificationResult:
+        """Create a batch classification result with manual input.
+
+        Args:
+            function_name: Name of the function.
+            file_path: Path to the file containing the function.
+            instruction_type: The manually selected instruction type.
+            is_factory: Whether this is a factory function.
+
+        Returns:
+            NodeClassificationResult with the manual selection.
+        """
+        from .schemas import INSTRUCTION_TO_CORE as SCHEMA_INSTRUCTION_TO_CORE
+
+        core = SCHEMA_INSTRUCTION_TO_CORE.get(instruction_type, CoreType.COGNITIVE)
+        wrapper_name = self._generate_wrapper_name(function_name, instruction_type)
+
+        return NodeClassificationResult(
+            function_name=function_name,
+            file_path=file_path,
+            instruction_type=instruction_type,
+            core=core,
+            confidence=1.0,
+            reasoning="Manually selected by user",
+            wrapper_name=wrapper_name,
+            is_factory=is_factory,
         )
 
     def _build_classification_prompt(self, function: ParsedFunction) -> str:
@@ -267,6 +380,133 @@ Provide your classification with:
 """
         return prompt
 
+    def _build_batch_classification_prompt(
+        self,
+        functions: list[FunctionInfo],
+        analysis: RepoAnalysisOutput | None = None,
+    ) -> str:
+        """Build the batch classification prompt with domain context.
+
+        Args:
+            functions: List of functions to classify.
+            analysis: Optional domain analysis for context.
+
+        Returns:
+            The prompt string for the LLM.
+        """
+        # Build instruction type reference
+        types_reference = []
+        for core, instructions in INSTRUCTION_TYPES.items():
+            types_reference.append(f"\n{core}:")
+            for instr, desc in instructions.items():
+                types_reference.append(f"  - {instr}: {desc}")
+
+        types_str = "\n".join(types_reference)
+
+        # Build domain context section
+        domain_context = ""
+        if analysis:
+            domain_context = f"""
+## Domain Context
+
+**Domain:** {analysis.domain}
+**Description:** {analysis.domain_description}
+**Framework:** {analysis.framework.value}
+
+### Identified Agent Roles
+"""
+            for role in analysis.agent_roles:
+                domain_context += f"- **{role.role_name}**: {role.description}\n"
+                domain_context += f"  - Functions: {', '.join(role.functions)}\n"
+                domain_context += (
+                    f"  - Suggested instruction: {role.suggested_instruction.value}\n"
+                )
+
+            domain_context += "\n### Workflow Stages\n"
+            for stage in analysis.workflow_stages:
+                domain_context += f"- **{stage.stage_name}**: {stage.description}\n"
+                domain_context += f"  - Roles: {', '.join(stage.agent_roles)}\n"
+
+        # Build functions section
+        functions_section = "## Functions to Classify\n\n"
+        for i, func in enumerate(functions, 1):
+            factory_marker = " [FACTORY FUNCTION]" if func.is_factory else ""
+            functions_section += f"""### {i}. {func.name}{factory_marker}
+
+**File:** {func.file_path}
+**Parameters:** {", ".join(func.parameters)}
+
+**Docstring:**
+{func.docstring or "(no docstring)"}
+
+**Source Code:**
+```python
+{func.source_code[:2000]}{"...(truncated)" if len(func.source_code) > 2000 else ""}
+```
+
+---
+"""
+
+        prompt = f"""You are an expert at classifying LLM agent functions into the Agent Constitution Framework (ACF) instruction types.
+
+## Available Instruction Types
+{types_str}
+{domain_context}
+{functions_section}
+
+## Task
+
+Analyze ALL the functions listed above and classify each one into the most appropriate ACF instruction type.
+
+For each function, provide:
+1. **instruction_type**: The ACF instruction type (e.g., GENERATE, VERIFY, TOOL_CALL)
+2. **core**: The core it belongs to (e.g., CognitiveCore, NormativeCore)  
+3. **confidence**: A confidence score from 0.0 to 1.0
+4. **reasoning**: Brief explanation for your choice
+5. **wrapper_name**: A suggested wrapper function name (e.g., "govern_analyst" for an analyst function)
+6. **is_factory**: Whether this is a factory function that returns a node function
+
+Consider the domain context when making classifications. For example:
+- In a trading system, analysts generate reports (GENERATE), researchers debate (REFLECT/NEGOTIATE), managers make decisions (EVALUATE_PROGRESS/VERIFY)
+- Factory functions that return node functions should be classified based on what the INNER function does
+
+Be consistent in your classifications for similar functions.
+"""
+        return prompt
+
+    def _generate_wrapper_name(
+        self, function_name: str, instruction_type: InstructionTypeEnum
+    ) -> str:
+        """Generate a wrapper function name based on function and instruction type.
+
+        Args:
+            function_name: Original function name.
+            instruction_type: The classified instruction type.
+
+        Returns:
+            Suggested wrapper function name.
+        """
+        # Extract role from function name
+        name_lower = function_name.lower()
+
+        # Common patterns
+        if "analyst" in name_lower:
+            return "govern_analyst"
+        if "researcher" in name_lower:
+            return "govern_researcher"
+        if "trader" in name_lower:
+            return "govern_trader"
+        if "manager" in name_lower or "judge" in name_lower:
+            return "govern_manager"
+        if "risk" in name_lower:
+            return "govern_risk_analyst"
+        if "tool" in name_lower:
+            return "govern_tool_call"
+
+        # Fallback based on instruction type
+        type_lower = instruction_type.value.lower()
+        return f"govern_{type_lower}"
+
     @staticmethod
     def get_all_instruction_types() -> list[str]:
         """Get list of all available instruction types.
@@ -287,3 +527,22 @@ Provide your classification with:
             The core name, or "CognitiveCore" as default.
         """
         return INSTRUCTION_TO_CORE.get(instruction_type, "CognitiveCore")
+
+
+def classify_functions_with_context(
+    functions: list[FunctionInfo],
+    analysis: RepoAnalysisOutput | None = None,
+    config: ClassificationConfig | None = None,
+) -> NodeClassificationBatch:
+    """Convenience function to classify functions with domain context.
+
+    Args:
+        functions: List of FunctionInfo objects to classify.
+        analysis: Optional RepoAnalysisOutput for domain context.
+        config: Optional classifier configuration.
+
+    Returns:
+        NodeClassificationBatch with all classifications.
+    """
+    classifier = InstructionClassifier(config=config)
+    return classifier.classify_batch_with_context(functions, analysis)
