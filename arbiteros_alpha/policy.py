@@ -441,3 +441,71 @@ class VerificationRequirementChecker(PolicyChecker):
                     return False
 
         return True
+
+
+@dataclass
+class MustUseToolsChecker(PolicyChecker):
+    """Ensure at least one tool has been called before responding.
+
+    This checker prevents agents from generating responses without first
+    using any tools to gather information. Common use case: ensuring
+    an agent doesn't hallucinate answers without consulting tools.
+
+    Example:
+        ```python
+        from arbiteros_alpha.policy import MustUseToolsChecker
+        from arbiteros_alpha.instructions import ExecutionCore
+
+        arbiter_os.add_policy_checker(
+            MustUseToolsChecker(
+                name="must_use_tools",
+                respond_instruction=ExecutionCore.RESPOND
+            )
+        )
+        ```
+    """
+
+    name: str
+    respond_instruction: InstructionType
+
+    def check_before(self, history: History) -> bool:
+        """Check if we're about to RESPOND without any prior TOOL_CALL.
+
+        This is called before each instruction executes. The history's last item
+        is the instruction that is ABOUT TO BE EXECUTED (with empty output_state).
+        All previous items are completed instructions with full output_state.
+
+        Args:
+            history: The execution history to validate.
+
+        Returns:
+            False if policy is violated (attempting RESPOND without tools).
+            True otherwise.
+        """
+        # Get all items from history
+        all_items = [item for superstep in history.entries for item in superstep]
+
+        if not all_items:
+            return True
+
+        # The last item is the instruction about to be executed
+        current_item = all_items[-1]
+
+        # If we're about to execute RESPOND, check if tools were used
+        if current_item.instruction == self.respond_instruction:
+            # Import here to avoid circular dependency
+            from .instructions import ExecutionCore
+
+            # Check previous history (excluding current item) for TOOL_CALL
+            has_tool_calls = any(
+                item.instruction == ExecutionCore.TOOL_CALL for item in all_items[:-1]
+            )
+
+            if not has_tool_calls:
+                logger.error(
+                    f"[{self.name}] Policy violation: Attempting to execute "
+                    f"{self.respond_instruction.name} without any prior TOOL_CALL."
+                )
+                return False
+
+        return True

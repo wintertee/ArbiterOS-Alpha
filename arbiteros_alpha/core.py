@@ -13,8 +13,6 @@ from collections.abc import Callable, Mapping
 from typing import Any, Literal
 
 from langfuse import Langfuse
-from langgraph.pregel import Pregel, _loop
-from langgraph.types import Command
 from pydantic import BaseModel, ValidationError
 
 from .evaluation import EvaluationResult, NodeEvaluator
@@ -232,10 +230,16 @@ class ArbiterOSAlpha:
             try:
                 result = evaluator.evaluate(self.history)
                 results[evaluator.name] = result
-                logger.info(
-                    f"Evaluator {evaluator.name}: score={result.score:.2f}, "
-                    f"passed={result.passed}, feedback={result.feedback}"
-                )
+                if result.passed:
+                    logger.debug(
+                        f"Evaluator {evaluator.name}: score={result.score:.2f}, "
+                        f"passed={result.passed}, feedback={result.feedback}"
+                    )
+                else:
+                    logger.error(
+                        f"Evaluator {evaluator.name}: score={result.score:.2f}, "
+                        f"passed={result.passed}, feedback={result.feedback}"
+                    )
             except Exception as e:
                 logger.error(
                     f"Evaluator {evaluator.name} failed with error: {e}",
@@ -311,10 +315,6 @@ class ArbiterOSAlpha:
                         "Instructions must be executed within a @arbiter_os.rollout context."
                     )
 
-                logger.debug(
-                    f"Executing instruction: {instruction_type.__class__.__name__}.{instruction_type.name}"
-                )
-
                 # Capture input state from arguments
                 sig = inspect.signature(func)
                 bound_args = sig.bind(*args, **kwargs)
@@ -360,12 +360,15 @@ class ArbiterOSAlpha:
                     as_type=observation_type,
                     name=func.__name__,  # type: ignore[attr-defined]
                 ) as generation:
+                    logger.info(
+                        f"instruction: {instruction_type.__class__.__name__}.{instruction_type.name} started with input: {input_state}"
+                    )
                     history_item.check_policy_results, all_passed = self._check_before()
 
                     result = func(*args, **kwargs)
 
-                    logger.debug(
-                        f"Instruction {instruction_type.name} returned: {result}"
+                    logger.info(
+                        f"instruction: {instruction_type.__class__.__name__}.{instruction_type.name} returned output: {result}"
                     )
 
                     if result is None:
@@ -426,6 +429,8 @@ class ArbiterOSAlpha:
                     )
 
                 if self.backend == "langgraph" and destination:
+                    from langgraph.types import Command
+
                     return Command(update=result, goto=destination)
 
                 return result
@@ -517,6 +522,9 @@ class ArbiterOSAlpha:
             - PregelLoop instances are created fresh on each invoke()/stream() call
             - Stack inspection adds minimal overhead (~1-2 frame traversals)
         """
+
+        from langgraph.pregel import Pregel, _loop
+
         # Check if already patched globally to avoid duplicate patching
         if hasattr(_loop.PregelLoop.__init__, "_arbiteros_patched"):
             logger.debug("PregelLoop already patched globally")
@@ -570,7 +578,7 @@ class ArbiterOSAlpha:
         _loop.PregelLoop.tick = patched_tick  # type: ignore[method-assign]
         logger.debug("PregelLoop.__init__ and tick successfully patched globally")
 
-    def register_compiled_graph(self, compiled_graph: Pregel) -> None:
+    def register_compiled_graph(self, compiled_graph) -> None:
         """Register a compiled LangGraph (Pregel) to be tracked by this ArbiterOSAlpha.
 
         This method should be called after compiling a LangGraph to associate

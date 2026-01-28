@@ -18,6 +18,7 @@ from .policy import (
     HumanInterruptPolicyChecker,
     HumanInterruptRequest,
     MetricThresholdPolicyRouter,
+    MustUseToolsChecker,
     PolicyChecker,
     PolicyRouter,
     VerificationRequirementChecker,
@@ -38,6 +39,7 @@ __all__ = [
     "PolicyRouter",
     # Policy - Built-in checkers
     "HistoryPolicyChecker",
+    "MustUseToolsChecker",
     "VerificationRequirementChecker",
     "HumanInterruptPolicyChecker",
     # Policy - Built-in routers
