@@ -401,26 +401,18 @@ class ArbiterOSAlpha:
             )
             return False
 
-    def _collect_metadata(
-        self, history_item: HistoryItem, has_evaluators: bool
-    ) -> dict[str, Any]:
+    def _collect_metadata(self, history_item: HistoryItem) -> dict[str, Any]:
         """Collect metadata from policy checks, evaluations, and routing.
 
         Args:
             history_item: The history item containing policy and evaluation results.
-            has_evaluators: Whether evaluators were run.
 
         Returns:
             A dictionary containing combined metadata.
         """
-        metadata: dict[str, Any] = dict(history_item.check_policy_results or {})
-
-        if has_evaluators and hasattr(history_item, "evaluation_results"):
-            metadata.update(history_item.evaluation_results)
-
-        if hasattr(history_item, "route_policy_results"):
-            metadata.update(history_item.route_policy_results)
-
+        metadata: dict[str, Any] = history_item.check_policy_results.copy()
+        metadata.update(history_item.evaluation_results)
+        metadata.update(history_item.route_policy_results)
         return metadata
 
     def instruction(
@@ -530,8 +522,7 @@ class ArbiterOSAlpha:
                     history_item.output_state = output_state
 
                     # Evaluate node execution quality
-                    has_evaluators = bool(self.evaluators)
-                    if has_evaluators:
+                    if self.evaluators:
                         history_item.evaluation_results = self._evaluate_node()
 
                     # Determine routing after execution
@@ -542,7 +533,7 @@ class ArbiterOSAlpha:
                         )
 
                     # Collect and update metadata
-                    metadata = self._collect_metadata(history_item, has_evaluators)
+                    metadata = self._collect_metadata(history_item)
                     observation.update(
                         input=input_state, output=result, metadata=metadata
                     )
