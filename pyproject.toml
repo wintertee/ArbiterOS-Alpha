@@ -5,24 +5,17 @@ description = "Yet another Arbiter-OS MVP"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "langchain>=1.0.2",
     "langgraph>=1.0.1",
     "rich>=14.2.0",
     "pydantic>=2.0.0",
-    "click>=8.0.0",
-    "langchain-openai>=0.1.0",
     "langfuse>=3.12.0",
 ]
 
 [project.optional-dependencies]
-dev = [
-    "pre-commit>=4.3.0",
-    "pytest>=8.0.0",
-    "mkdocs>=1.6.1",
-    "mkdocs-material>=9.6.23",
-    "mkdocstrings>=0.30.1",
-    "mkdocstrings-python>=1.18.2",
-    "ruff>=0.14.3"
+migrator = [
+    "langchain>=1.0.2",
+    "click>=8.0.0",
+    "langchain-openai>=0.1.0",
 ]
 
 [[tool.uv.index]]
@@ -32,3 +25,17 @@ default = true
 
 [tool.pytest.ini_options]
 norecursedirs = ["examples/TradingAgents"]
+
+[dependency-groups]
+dev = [
+    "uv>=0.9.27",
+    "pre-commit>=4.3.0",
+    "pytest>=8.0.0",
+    "mkdocs>=1.6.1",
+    "mkdocs-material>=9.6.23",
+    "mkdocstrings>=0.30.1",
+    "mkdocstrings-python>=1.18.2",
+    "ruff>=0.14.3",
+    "ipykernel>=7.1.0",
+    "nbconvert>=7.16.6",
+]
