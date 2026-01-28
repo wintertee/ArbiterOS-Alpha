@@ -523,7 +523,9 @@ class ArbiterOSAlpha:
                     )
 
                     # Validate output state
-                    self._validate_output_state(output_state, output_schema, func.__name__)
+                    self._validate_output_state(
+                        output_state, output_schema, func.__name__
+                    )
 
                     history_item.output_state = output_state
 
