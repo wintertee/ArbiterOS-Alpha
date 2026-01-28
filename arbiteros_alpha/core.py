@@ -9,11 +9,13 @@ import functools
 import inspect
 import logging
 import weakref
-from typing import Any, Callable, Literal
+from collections.abc import Callable, Mapping
+from typing import Any, Literal
 
 from langfuse import Langfuse
 from langgraph.pregel import Pregel, _loop
 from langgraph.types import Command
+from pydantic import BaseModel, ValidationError
 
 from .evaluation import EvaluationResult, NodeEvaluator
 from .history import History, HistoryItem
@@ -260,7 +262,10 @@ class ArbiterOSAlpha:
         return mapping[core_type]
 
     def instruction(
-        self, instruction_type: InstructionType
+        self,
+        instruction_type: InstructionType,
+        input_schema: type[BaseModel] | None = None,
+        output_schema: type[BaseModel] | None = None,
     ) -> Callable[[Callable], Callable]:
         """Decorator to wrap LangGraph node functions with policy governance.
 
@@ -272,6 +277,12 @@ class ArbiterOSAlpha:
             instruction_type: An instruction type from one of the Core enums
                 (CognitiveCore, MemoryCore, ExecutionCore, NormativeCore,
                 MetacognitiveCore, AdaptiveCore, SocialCore, or AffectiveCore).
+            input_schema: Optional Pydantic model to validate the input state.
+                If provided, the input state will be validated against this schema
+                before execution.
+            output_schema: Optional Pydantic model to validate the output state.
+                If provided, the result will be validated against this schema
+                after execution.
 
         Returns:
             A decorator function that wraps the target node function.
@@ -295,7 +306,7 @@ class ArbiterOSAlpha:
         def decorator(func: Callable) -> Callable:
             @functools.wraps(func)
             def wrapper(*args, **kwargs) -> Any:
-                if not self._in_rollout:
+                if not self._in_rollout or self.span is None:
                     raise RuntimeError(
                         "Instructions must be executed within a @arbiter_os.rollout context."
                     )
@@ -305,16 +316,31 @@ class ArbiterOSAlpha:
                 )
 
                 # Capture input state from arguments
-                input_state = None
-                if self.backend == "native":
-                    # For native backend, capture all named arguments
-                    sig = inspect.signature(func)
-                    bound_args = sig.bind(*args, **kwargs)
-                    bound_args.apply_defaults()
-                    input_state = bound_args.arguments
-                else:
-                    # For langgraph backend, usually the first argument is the state
-                    input_state = args[0] if args else None
+                sig = inspect.signature(func)
+                bound_args = sig.bind(*args, **kwargs)
+                bound_args.apply_defaults()
+                input_state: Mapping = bound_args.arguments
+
+                # Capture output fields from output_schema
+                if output_schema is not None:
+                    output_fields: list[str] = list(output_schema.model_fields.keys())
+
+                if self.backend == "langgraph":
+                    # For langgraph backend, the first argument is the state
+                    input_state: Mapping | BaseModel = next(iter(input_state.values()))
+
+                # input_schema validation
+                if input_schema is not None:
+                    try:
+                        input_schema.model_validate(input_state)
+                    except ValidationError as ve:
+                        logger.error(
+                            f"Input validation failed for {func.__name__}: {ve}",  # type: ignore[attr-defined]
+                            exc_info=True,
+                        )
+
+                if isinstance(input_state, BaseModel):
+                    input_state: Mapping = input_state.model_dump()
 
                 history_item = HistoryItem(
                     timestamp=datetime.datetime.now(),
@@ -332,7 +358,7 @@ class ArbiterOSAlpha:
 
                 with self.span.start_as_current_observation(
                     as_type=observation_type,
-                    name=func.__name__,
+                    name=func.__name__,  # type: ignore[attr-defined]
                 ) as generation:
                     history_item.check_policy_results, all_passed = self._check_before()
 
@@ -341,13 +367,54 @@ class ArbiterOSAlpha:
                     logger.debug(
                         f"Instruction {instruction_type.name} returned: {result}"
                     )
-                    history_item.output_state = result
+
+                    if result is None:
+                        return
+
+                    # Convert result to output_state based on return type
+                    if isinstance(result, dict):
+                        output_state: Mapping = result
+                    elif isinstance(result, BaseModel):
+                        output_state: Mapping = result.model_dump()
+                    else:
+                        # Convert single value or tuple to tuple
+                        result_tuple = (
+                            (result,) if not isinstance(result, tuple) else result
+                        )
+
+                        # Map tuple to dict using schema fields or enumeration
+                        if output_schema is not None:
+                            output_state: Mapping = dict(
+                                zip(output_fields, result_tuple)
+                            )
+                        else:
+                            output_state = dict(enumerate(result_tuple))
+                            logger.warning(
+                                f"Function {func.__name__} returned a non-dict/non-BaseModel value without output_schema. "  # type: ignore[attr-defined]
+                                f"Using numeric indices as keys in history: {list(output_state.keys())}. "
+                                f"Consider adding output_schema or returning a dict for better readability."
+                            )
+
+                    # Validate output if schema is provided
+                    if output_schema is not None:
+                        try:
+                            output_schema.model_validate(output_state)
+                        except ValidationError as ve:
+                            logger.error(
+                                f"Output validation failed for {func.__name__}: {ve}",  # type: ignore[attr-defined]
+                                exc_info=True,
+                            )
+
+                    history_item.output_state = output_state
 
                     # Evaluate node execution quality
                     if self.evaluators:
                         history_item.evaluation_results = self._evaluate_node()
 
-                    history_item.route_policy_results, destination = self._route_after()
+                    if self.backend == "langgraph":
+                        history_item.route_policy_results, destination = (
+                            self._route_after()
+                        )
                     metadata = (
                         history_item.check_policy_results
                         | getattr(history_item, "evaluation_results", {})
@@ -358,7 +425,7 @@ class ArbiterOSAlpha:
                         input=input_state, output=result, metadata=metadata
                     )
 
-                if destination:
+                if self.backend == "langgraph" and destination:
                     return Command(update=result, goto=destination)
 
                 return result
@@ -394,15 +461,16 @@ class ArbiterOSAlpha:
                 self.history = History()
                 self.span = self.langfuse.start_span(name="arbiteros_alpha_record")
                 self._in_rollout = True
-                logger.info(f"--- Starting Rollout: {func.__name__} ---")
+                logger.info(f"--- Starting Rollout: {func.__name__} ---")  # type: ignore[attr-defined]
 
                 try:
                     result = func(*args, **kwargs)
-                    logger.info(f"--- Rollout Completed: {func.__name__} ---")
+                    logger.info(f"--- Rollout Completed: {func.__name__} ---")  # type: ignore[attr-defined]
                     return result
                 except Exception:
                     logger.error(
-                        f"--- Rollout Failed: {func.__name__} ---", exc_info=True
+                        f"--- Rollout Failed: {func.__name__} ---",  # type: ignore[attr-defined]
+                        exc_info=True,
                     )
                     raise
                 finally:
@@ -496,10 +564,10 @@ class ArbiterOSAlpha:
             return result
 
         # Mark as patched to prevent duplicate patching
-        patched_init._arbiteros_patched = True
-        patched_tick._arbiteros_patched = True
-        _loop.PregelLoop.__init__ = patched_init
-        _loop.PregelLoop.tick = patched_tick
+        patched_init._arbiteros_patched = True  # type: ignore[attr-defined]
+        patched_tick._arbiteros_patched = True  # type: ignore[attr-defined]
+        _loop.PregelLoop.__init__ = patched_init  # type: ignore[assignment]
+        _loop.PregelLoop.tick = patched_tick  # type: ignore[method-assign]
         logger.debug("PregelLoop.__init__ and tick successfully patched globally")
 
     def register_compiled_graph(self, compiled_graph: Pregel) -> None:

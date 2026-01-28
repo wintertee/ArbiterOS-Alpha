@@ -29,3 +29,6 @@ dev = [
 name = "aliyun"
 url = "https://mirrors.aliyun.com/pypi/simple/"
 default = true
+
+[tool.pytest.ini_options]
+norecursedirs = ["examples/TradingAgents"]

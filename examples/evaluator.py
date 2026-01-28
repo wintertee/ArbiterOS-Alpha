@@ -12,8 +12,8 @@ Use cases:
 """
 
 import logging
-from typing import TypedDict
 
+from pydantic import BaseModel
 from rich.logging import RichHandler
 
 from arbiteros_alpha import ArbiterOSAlpha
@@ -158,18 +158,28 @@ arbiter_os.add_evaluator(ConsistencyEvaluator())
 # 4. Define state and functions
 
 
-class State(TypedDict):
+class GenerateInput(BaseModel):
     """State for a simple AI assistant."""
 
     query: str
+
+
+class GenerateOutput(BaseModel):
     response: str
     confidence: float
 
 
-@arbiter_os.instruction(CognitiveCore.GENERATE)
-def generate(state: State) -> State:
+class VerifyInput(BaseModel):
+    response: str
+
+
+@arbiter_os.instruction(
+    CognitiveCore.GENERATE,
+    input_schema=GenerateInput,
+    output_schema=GenerateOutput,
+)
+def generate(query: str):
     """Generate a response to the user query."""
-    query = state["query"]
 
     # Simulate different quality responses based on query
     if "formal" in query.lower():
@@ -182,17 +192,19 @@ def generate(state: State) -> State:
         response = "Sure, I can help with that. Here's what you need to know."
         confidence = 0.8
 
-    return {"response": response, "confidence": confidence}
+    return response, confidence
 
 
-@arbiter_os.instruction(NormativeCore.VERIFY)
-def verify(state: State) -> State:
+@arbiter_os.instruction(
+    NormativeCore.VERIFY,
+    input_schema=VerifyInput,
+)
+def verify(response):
     """Verify the response quality."""
-    response = state["response"]
     # Simple verification: check if response is not empty
     verified = len(response) > 0
     logger.info(f"Verification result: {verified}")
-    return {}
+    return verified
 
 
 # 5. Run workflow with different scenarios
@@ -201,46 +213,9 @@ def verify(state: State) -> State:
 @arbiter_os.rollout()
 def main():
     """Run the workflow with different query types."""
-    scenarios = [
-        {
-            "query": "Tell me about AI in a formal way",
-            "response": "",
-            "confidence": 0.0,
-        },
-        {
-            "query": "Explain machine learning casually",
-            "response": "",
-            "confidence": 0.0,
-        },
-        {"query": "What is deep learning?", "response": "", "confidence": 0.0},
-    ]
-
-    for idx, initial_state in enumerate(scenarios, 1):
-        logger.info(f"\n{'=' * 60}")
-        logger.info(f"Scenario {idx}: {initial_state['query']}")
-        logger.info(f"{'=' * 60}\n")
-
-        state = initial_state.copy()
-        state.update(generate(state))
-
-        state.update(verify(state))
-
-    logger.info("\n" + "=" * 60)
-    logger.info("Execution complete. Evaluation summary:")
-    logger.info("=" * 60)
-
-    # Print summary of evaluations
-    for superstep_idx, superstep in enumerate(arbiter_os.history.entries, 1):
-        for item_idx, item in enumerate(superstep, 1):
-            if item.evaluation_results:
-                logger.info(
-                    f"\nSuperstep {superstep_idx}.{item_idx} - {item.instruction.name}:"
-                )
-                for eval_name, result in item.evaluation_results.items():
-                    status = "✓" if result.passed else "✗"
-                    logger.info(
-                        f"  {status} {eval_name}: score={result.score:.2f}, {result.feedback}"
-                    )
+    query = "Tell me about AI in a formal way"
+    response, confidence = generate(query=query)
+    verify(response=response)
 
 
 if __name__ == "__main__":
