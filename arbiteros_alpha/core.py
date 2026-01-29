@@ -265,6 +265,156 @@ class ArbiterOSAlpha:
             raise ValueError(f"Invalid instruction type: {instruction_type}")
         return mapping[core_type]
 
+    def _validate_instruction_type(self, instruction_type: InstructionType) -> None:
+        """Validate that the instruction type is a valid InstructionType enum.
+
+        Args:
+            instruction_type: The instruction type to validate.
+
+        Raises:
+            TypeError: If instruction_type is not a valid InstructionType enum.
+        """
+        if not isinstance(instruction_type, InstructionType.__args__):
+            raise TypeError(
+                f"instruction_type must be an instance of one of the Core enums, "
+                f"got {type(instruction_type)}"
+            )
+
+    def _extract_input_state(
+        self, func: Callable, args: tuple, kwargs: dict
+    ) -> Mapping | BaseModel:
+        """Extract and prepare the input state from function arguments.
+
+        Args:
+            func: The decorated function.
+            args: Positional arguments passed to the function.
+            kwargs: Keyword arguments passed to the function.
+
+        Returns:
+            The extracted input state (may be a Mapping or BaseModel).
+        """
+        sig = inspect.signature(func)
+        bound_args = sig.bind(*args, **kwargs)
+        bound_args.apply_defaults()
+        input_state: Mapping = bound_args.arguments
+
+        if self.backend == "langgraph":
+            # For langgraph backend, the first argument is the state
+            input_state = next(iter(input_state.values()))
+
+        return input_state
+
+    def _validate_input_state(
+        self, input_state: Mapping, input_schema: type[BaseModel] | None, func_name: str
+    ) -> bool:
+        """Validate the input state against the provided schema.
+
+        Args:
+            input_state: The input state to validate.
+            input_schema: Optional Pydantic model for validation.
+            func_name: Name of the function being validated (for logging).
+
+        Returns:
+            True if validation passes or no schema is provided, False otherwise.
+        """
+        if input_schema is None:
+            return True
+
+        try:
+            input_schema.model_validate(input_state)
+            return True
+        except ValidationError as validation_error:
+            logger.error(
+                f"Input validation failed for {func_name}: {validation_error}",
+                exc_info=True,
+            )
+            return False
+
+    def _prepare_output_state(
+        self,
+        result: Any,
+        output_schema: type[BaseModel] | None,
+        func_name: str,
+    ) -> Mapping:
+        """Convert the function result to an output state mapping.
+
+        Args:
+            result: The return value from the decorated function.
+            output_schema: Optional Pydantic model defining output fields.
+            func_name: Name of the function (for logging).
+
+        Returns:
+            The output state as a mapping.
+
+        Note:
+            Logs a warning if result cannot be cleanly converted without output_schema.
+        """
+        if isinstance(result, dict):
+            return result
+
+        if isinstance(result, BaseModel):
+            return result.model_dump()
+
+        # Convert single value or tuple to tuple
+        result_tuple = (result,) if not isinstance(result, tuple) else result
+
+        # Map tuple to dict using schema fields or enumeration
+        if output_schema is not None:
+            output_fields: list[str] = list(output_schema.model_fields.keys())
+            return dict(zip(output_fields, result_tuple))
+
+        # Fallback to numeric indices
+        output_state = dict(enumerate(result_tuple))
+        logger.warning(
+            f"Function {func_name} returned a non-dict/non-BaseModel value without output_schema. "
+            f"Using numeric indices as keys in history: {list(output_state.keys())}. "
+            f"Consider adding output_schema or returning a dict for better readability."
+        )
+        return output_state
+
+    def _validate_output_state(
+        self,
+        output_state: Mapping,
+        output_schema: type[BaseModel] | None,
+        func_name: str,
+    ) -> bool:
+        """Validate the output state against the provided schema.
+
+        Args:
+            output_state: The output state to validate.
+            output_schema: Optional Pydantic model for validation.
+            func_name: Name of the function being validated (for logging).
+
+        Returns:
+            True if validation passes or no schema is provided, False otherwise.
+        """
+        if output_schema is None:
+            return True
+
+        try:
+            output_schema.model_validate(output_state)
+            return True
+        except ValidationError as validation_error:
+            logger.error(
+                f"Output validation failed for {func_name}: {validation_error}",
+                exc_info=True,
+            )
+            return False
+
+    def _collect_metadata(self, history_item: HistoryItem) -> dict[str, Any]:
+        """Collect metadata from policy checks, evaluations, and routing.
+
+        Args:
+            history_item: The history item containing policy and evaluation results.
+
+        Returns:
+            A dictionary containing combined metadata.
+        """
+        metadata: dict[str, Any] = history_item.check_policy_results.copy()
+        metadata.update(history_item.evaluation_results)
+        metadata.update(history_item.route_policy_results)
+        return metadata
+
     def instruction(
         self,
         instruction_type: InstructionType,
@@ -301,11 +451,7 @@ class ArbiterOSAlpha:
             # Function now includes policy checks and history tracking
             ```
         """
-        # Validate that instruction_type is a valid InstructionType enum
-        if not isinstance(instruction_type, InstructionType.__args__):
-            raise TypeError(
-                f"instruction_type must be an instance of one of the Core enums, got {type(instruction_type)}"
-            )
+        self._validate_instruction_type(instruction_type)
 
         def decorator(func: Callable) -> Callable:
             @functools.wraps(func)
@@ -315,33 +461,17 @@ class ArbiterOSAlpha:
                         "Instructions must be executed within a @arbiter_os.rollout context."
                     )
 
-                # Capture input state from arguments
-                sig = inspect.signature(func)
-                bound_args = sig.bind(*args, **kwargs)
-                bound_args.apply_defaults()
-                input_state: Mapping = bound_args.arguments
+                # Extract and prepare input state
+                input_state = self._extract_input_state(func, args, kwargs)
 
-                # Capture output fields from output_schema
-                if output_schema is not None:
-                    output_fields: list[str] = list(output_schema.model_fields.keys())
+                # Validate input state
+                self._validate_input_state(input_state, input_schema, func.__name__)
 
-                if self.backend == "langgraph":
-                    # For langgraph backend, the first argument is the state
-                    input_state: Mapping | BaseModel = next(iter(input_state.values()))
-
-                # input_schema validation
-                if input_schema is not None:
-                    try:
-                        input_schema.model_validate(input_state)
-                    except ValidationError as ve:
-                        logger.error(
-                            f"Input validation failed for {func.__name__}: {ve}",  # type: ignore[attr-defined]
-                            exc_info=True,
-                        )
-
+                # Convert BaseModel to dict if needed
                 if isinstance(input_state, BaseModel):
-                    input_state: Mapping = input_state.model_dump()
+                    input_state = input_state.model_dump()
 
+                # Create history entry
                 history_item = HistoryItem(
                     timestamp=datetime.datetime.now(),
                     instruction=instruction_type,
@@ -353,60 +483,41 @@ class ArbiterOSAlpha:
 
                 self.history.add_entry(history_item)
 
-                # langfuse record
+                # Get langfuse observation type
                 observation_type = self._get_observation_type(instruction_type)
 
                 with self.span.start_as_current_observation(
                     as_type=observation_type,
                     name=func.__name__,  # type: ignore[attr-defined]
-                ) as generation:
+                ) as observation:
                     logger.info(
-                        f"instruction: {instruction_type.__class__.__name__}.{instruction_type.name} started with input: {input_state}"
+                        f"instruction: {instruction_type.__class__.__name__}.{instruction_type.name} "
+                        f"started with input: {input_state}"
                     )
-                    history_item.check_policy_results, all_passed = self._check_before()
 
+                    # Run policy checkers before execution
+                    history_item.check_policy_results, _ = self._check_before()
+
+                    # Execute the decorated function
                     result = func(*args, **kwargs)
 
                     logger.info(
-                        f"instruction: {instruction_type.__class__.__name__}.{instruction_type.name} returned output: {result}"
+                        f"instruction: {instruction_type.__class__.__name__}.{instruction_type.name} "
+                        f"returned output: {result}"
                     )
 
                     if result is None:
                         return
 
-                    # Convert result to output_state based on return type
-                    if isinstance(result, dict):
-                        output_state: Mapping = result
-                    elif isinstance(result, BaseModel):
-                        output_state: Mapping = result.model_dump()
-                    else:
-                        # Convert single value or tuple to tuple
-                        result_tuple = (
-                            (result,) if not isinstance(result, tuple) else result
-                        )
+                    # Convert result to output state
+                    output_state = self._prepare_output_state(
+                        result, output_schema, func.__name__
+                    )
 
-                        # Map tuple to dict using schema fields or enumeration
-                        if output_schema is not None:
-                            output_state: Mapping = dict(
-                                zip(output_fields, result_tuple)
-                            )
-                        else:
-                            output_state = dict(enumerate(result_tuple))
-                            logger.warning(
-                                f"Function {func.__name__} returned a non-dict/non-BaseModel value without output_schema. "  # type: ignore[attr-defined]
-                                f"Using numeric indices as keys in history: {list(output_state.keys())}. "
-                                f"Consider adding output_schema or returning a dict for better readability."
-                            )
-
-                    # Validate output if schema is provided
-                    if output_schema is not None:
-                        try:
-                            output_schema.model_validate(output_state)
-                        except ValidationError as ve:
-                            logger.error(
-                                f"Output validation failed for {func.__name__}: {ve}",  # type: ignore[attr-defined]
-                                exc_info=True,
-                            )
+                    # Validate output state
+                    self._validate_output_state(
+                        output_state, output_schema, func.__name__
+                    )
 
                     history_item.output_state = output_state
 
@@ -414,20 +525,20 @@ class ArbiterOSAlpha:
                     if self.evaluators:
                         history_item.evaluation_results = self._evaluate_node()
 
+                    # Determine routing after execution
+                    destination = None
                     if self.backend == "langgraph":
                         history_item.route_policy_results, destination = (
                             self._route_after()
                         )
-                    metadata = (
-                        history_item.check_policy_results
-                        | getattr(history_item, "evaluation_results", {})
-                        | history_item.route_policy_results
-                    )
 
-                    generation.update(
+                    # Collect and update metadata
+                    metadata = self._collect_metadata(history_item)
+                    observation.update(
                         input=input_state, output=result, metadata=metadata
                     )
 
+                # Return routing command if applicable
                 if self.backend == "langgraph" and destination:
                     from langgraph.types import Command
 
